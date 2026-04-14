@@ -1,4 +1,4 @@
-# CineMatch · KNN Movie Recommender
+# KNN Movie Recommender
 
 Sistema de recomendación de películas en local usando el algoritmo K-Nearest Neighbors con distancias Manhattan y Euclidiana.
 

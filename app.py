@@ -1,13 +1,18 @@
 """
 Sistema de Recomendación de Películas — KNN (Manhattan y Euclidiana)
 Backend Flask: lógica de distancias implementada desde cero sin librerías externas.
+VERSIÓN 2.0 - Con Influencer Match + Complejidad Computacional
 """
 from __future__ import annotations
 
 import os
 import json
 import math
+import time
+import sys
 import pandas as pd
+import psutil
+import platform
 from flask import Flask, jsonify, request, render_template
 
 app = Flask(__name__)
@@ -26,22 +31,37 @@ movies_list   = []   # lista de dicts para el endpoint /api/movies
 user_names    = {}   # {str(userId): nombre}
 next_user_id  = 1
 
+# Métricas de rendimiento
+load_times = {"ratings_ms": 0, "movies_ms": 0}
 
-# ─── Carga de datos ────────────────────────────────────────────────────────────
+
+# ─── Carga de datos con medición de tiempo ────────────────────────────────────
 
 def cargar_datos():
-    """Carga los CSV de ratings y películas (Polars si disponible, si no Pandas).
+    """Carga los CSV de ratings y películas con medición de tiempo.
     Construye el diccionario de ratings para el cálculo de distancias."""
-    global ratings_dict, title_lookup, movies_list, user_names, next_user_id
+    global ratings_dict, title_lookup, movies_list, user_names, next_user_id, load_times
+
+    start_total = time.perf_counter()
 
     # Intentar con Polars para carga rápida; caer en Pandas si no está instalado
     try:
         import polars as pl
+        start_ratings = time.perf_counter()
         df_ratings = pl.read_csv(RATINGS_PATH, columns=["userId", "movieId", "rating"]).to_pandas()
-        df_movies  = pl.read_csv(MOVIES_PATH).to_pandas()
+        load_times["ratings_ms"] = (time.perf_counter() - start_ratings) * 1000
+
+        start_movies = time.perf_counter()
+        df_movies = pl.read_csv(MOVIES_PATH).to_pandas()
+        load_times["movies_ms"] = (time.perf_counter() - start_movies) * 1000
     except ImportError:
+        start_ratings = time.perf_counter()
         df_ratings = pd.read_csv(RATINGS_PATH, usecols=["userId", "movieId", "rating"])
-        df_movies  = pd.read_csv(MOVIES_PATH)
+        load_times["ratings_ms"] = (time.perf_counter() - start_ratings) * 1000
+
+        start_movies = time.perf_counter()
+        df_movies = pd.read_csv(MOVIES_PATH)
+        load_times["movies_ms"] = (time.perf_counter() - start_movies) * 1000
 
     # Asegurar tipos numéricos correctos antes de procesar
     df_ratings["userId"]  = df_ratings["userId"].astype(int)
@@ -62,7 +82,6 @@ def cargar_datos():
             pass
 
     # Construir diccionario de ratings: {userId -> {movieId -> rating}}
-    # Se itera fila a fila para no depender de operaciones de agregación de pandas
     nuevo_dict = {}
     for uid, mid, rat in zip(df_ratings["userId"], df_ratings["movieId"], df_ratings["rating"]):
         uid = int(uid)
@@ -115,7 +134,6 @@ def distancia_manhattan(ratings_a, ratings_b):
 
     for pelicula, rating_a in ratings_a.items():
         if pelicula in ratings_b:
-            # Diferencia absoluta entre los dos ratings para esta película
             total += abs(rating_a - ratings_b[pelicula])
             peliculas_comunes += 1
 
@@ -138,7 +156,6 @@ def distancia_euclidiana(ratings_a, ratings_b):
     for pelicula, rating_a in ratings_a.items():
         if pelicula in ratings_b:
             diferencia = rating_a - ratings_b[pelicula]
-            # Elevar al cuadrado y acumular
             suma_cuadrados += diferencia * diferencia
             peliculas_comunes += 1
 
@@ -166,24 +183,21 @@ def calcular_distancias(user_id, metrica="manhattan"):
 
     for otro_id, ratings_vecino in ratings_dict.items():
         if otro_id == user_id:
-            continue  # no comparar al usuario consigo mismo
+            continue
 
-        # Calcular distancia según la métrica seleccionada
         if metrica == "manhattan":
             distancia, comunes = distancia_manhattan(ratings_usuario, ratings_vecino)
         else:
             distancia, comunes = distancia_euclidiana(ratings_usuario, ratings_vecino)
 
-        # Solo incluir vecinos que compartan al menos una película valorada
         if comunes > 0:
             resultados.append({
                 "userId":       otro_id,
                 "name":         user_names.get(str(otro_id), f"User {otro_id}"),
-                "distance":     round(distancia, 4),
+                "distance":     round(distancia, 6),
                 "commonMovies": comunes,
             })
 
-    # Ordenar de menor (más cercano) a mayor (más lejano)
     resultados.sort(key=lambda x: x["distance"])
     return resultados
 
@@ -204,11 +218,7 @@ def obtener_recomendaciones(user_id, vecinos, umbral=3.0):
     if user_id not in ratings_dict:
         return []
 
-    # Conjunto de películas que el usuario ya ha visto (se excluyen de la recomendación)
     peliculas_vistas = set(ratings_dict[user_id].keys())
-
-    # Acumular ratings de vecinos para películas no vistas por el usuario principal
-    # Estructura: {movieId: [(vecino_id, rating), ...]}
     acumulador = {}
 
     for vecino in vecinos:
@@ -217,10 +227,8 @@ def obtener_recomendaciones(user_id, vecinos, umbral=3.0):
             continue
 
         for pelicula_id, rating in ratings_dict[vid].items():
-            # Omitir si el usuario principal ya vio esta película
             if pelicula_id in peliculas_vistas:
                 continue
-            # Omitir si el rating del vecino no supera el umbral establecido
             if rating <= umbral:
                 continue
 
@@ -231,7 +239,6 @@ def obtener_recomendaciones(user_id, vecinos, umbral=3.0):
     if not acumulador:
         return []
 
-    # Construir lista final de recomendaciones con promedio y cantidad de votos
     recomendaciones = []
     for pelicula_id, votos in acumulador.items():
         ratings_validos = [r for _, r in votos]
@@ -240,16 +247,195 @@ def obtener_recomendaciones(user_id, vecinos, umbral=3.0):
         recomendaciones.append({
             "movieId":      int(pelicula_id),
             "title":        title_lookup.get(pelicula_id, f"Movie {pelicula_id}"),
-            "avgRating":    round(promedio, 2),
+            "avgRating":    round(promedio, 4),
             "numVotes":     len(ratings_validos),
             "recommenders": [int(uid) for uid, _ in votos],
         })
 
-    # Ordenar por promedio descendente; en empate, por cantidad de votos descendente
     return sorted(recomendaciones, key=lambda x: (-x["avgRating"], -x["numVotes"]))
 
 
-# ─── Rutas Flask ───────────────────────────────────────────────────────────────
+# ─── NUEVO: Influencer + Match ─────────────────────────────────────────────────
+
+@app.route("/api/influencer", methods=["POST"])
+def influencer_recommend():
+    """Modo influencer: un usuario influye a sus K vecinos más cercanos.
+    Recomienda películas que el influencer valora > threshold y que los vecinos no han visto.
+    """
+    cuerpo = request.get_json(force=True)
+    influencer_id = int(cuerpo.get("influencerId", 0))
+    k = max(1, int(cuerpo.get("k", 5)))
+    metrica = cuerpo.get("metric", "manhattan")
+    umbral = float(cuerpo.get("threshold", 3.5))
+
+    if influencer_id not in ratings_dict:
+        return jsonify({"error": "Influencer no encontrado"}), 404
+
+    # Obtener vecinos más cercanos al influencer
+    distancias = calcular_distancias(influencer_id, metrica)
+    if distancias is None:
+        return jsonify({"error": "Error calculando distancias"}), 500
+
+    vecinos = distancias[:k]
+
+    # Películas que el influencer ha valorado alto (> umbral)
+    ratings_influencer = ratings_dict[influencer_id]
+    peliculas_influencer_alto = {mid for mid, rat in ratings_influencer.items() if rat > umbral}
+
+    # Acumular recomendaciones
+    acumulador = {}
+
+    for vecino in vecinos:
+        vid = vecino["userId"]
+        if vid not in ratings_dict:
+            continue
+        peliculas_vistas_vecino = set(ratings_dict[vid].keys())
+        candidatas = peliculas_influencer_alto - peliculas_vistas_vecino
+        for mid in candidatas:
+            if mid not in acumulador:
+                acumulador[mid] = []
+            acumulador[mid].append((vid, ratings_influencer[mid]))
+
+    recomendaciones = []
+    for mid, votos in acumulador.items():
+        ratings_inf = [r for _, r in votos]
+        promedio = sum(ratings_inf) / len(ratings_inf)
+        recomendaciones.append({
+            "movieId": int(mid),
+            "title": title_lookup.get(mid, f"Movie {mid}"),
+            "avgRating": round(promedio, 4),
+            "numVotes": len(votos),
+            "influencerRating": ratings_influencer[mid],
+        })
+
+    recomendaciones.sort(key=lambda x: (-x["avgRating"], -x["numVotes"]))
+
+    return jsonify({
+        "influencerId": influencer_id,
+        "influencerName": user_names.get(str(influencer_id), f"User {influencer_id}"),
+        "k": k,
+        "metric": metrica,
+        "neighbors": vecinos,
+        "recommendations": recomendaciones[:50]
+    })
+
+
+@app.route("/api/match", methods=["POST"])
+def match_users():
+    """Modo match: compara dos usuarios específicos y recomienda películas
+    que el primero (influencer) ha valorado alto y el segundo no ha visto.
+    """
+    cuerpo = request.get_json(force=True)
+    user_a = int(cuerpo.get("userA", 0))
+    user_b = int(cuerpo.get("userB", 0))
+    metrica = cuerpo.get("metric", "manhattan")
+    umbral = float(cuerpo.get("threshold", 3.5))
+
+    if user_a not in ratings_dict or user_b not in ratings_dict:
+        return jsonify({"error": "Uno o ambos usuarios no existen"}), 404
+
+    ratings_a = ratings_dict[user_a]
+    ratings_b = ratings_dict[user_b]
+
+    if metrica == "manhattan":
+        dist, comunes = distancia_manhattan(ratings_a, ratings_b)
+    else:
+        dist, comunes = distancia_euclidiana(ratings_a, ratings_b)
+
+    peliculas_vistas_b = set(ratings_b.keys())
+    peliculas_alto_a = {mid for mid, rat in ratings_a.items() if rat > umbral}
+    candidatas = peliculas_alto_a - peliculas_vistas_b
+
+    recomendaciones = []
+    for mid in candidatas:
+        recomendaciones.append({
+            "movieId": int(mid),
+            "title": title_lookup.get(mid, f"Movie {mid}"),
+            "influencerRating": ratings_a[mid],
+        })
+
+    recomendaciones.sort(key=lambda x: -x["influencerRating"])
+
+    return jsonify({
+        "userA": user_a,
+        "userAName": user_names.get(str(user_a), f"User {user_a}"),
+        "userB": user_b,
+        "userBName": user_names.get(str(user_b), f"User {user_b}"),
+        "distance": round(dist, 6),
+        "commonMovies": comunes,
+        "metric": metrica,
+        "recommendations": recomendaciones[:50]
+    })
+
+
+@app.route("/api/complexity", methods=["GET"])
+def get_complexity():
+    """Devuelve métricas de complejidad computacional."""
+    global load_times
+
+    # Tamaño en memoria estimado
+    num_users = len(ratings_dict)
+    total_ratings = sum(len(v) for v in ratings_dict.values())
+    mem_estimate_bytes = total_ratings * 72 + num_users * 56
+    mem_mb = mem_estimate_bytes / (1024 * 1024)
+
+    # Medir tiempo de distancias en caliente
+    sample_user = next(iter(ratings_dict.keys())) if ratings_dict else None
+    time_mh = 0.0
+    time_eu = 0.0
+    time_rec = 0.0
+
+    if sample_user:
+        start = time.perf_counter()
+        _ = calcular_distancias(sample_user, "manhattan")
+        time_mh = (time.perf_counter() - start) * 1000
+
+        start = time.perf_counter()
+        _ = calcular_distancias(sample_user, "euclidean")
+        time_eu = (time.perf_counter() - start) * 1000
+
+        dists = calcular_distancias(sample_user, "manhattan")
+        if dists:
+            start = time.perf_counter()
+            _ = obtener_recomendaciones(sample_user, dists[:5], 3.0)
+            time_rec = (time.perf_counter() - start) * 1000
+
+    # Hardware
+    cpu_name = platform.processor()
+    if not cpu_name:
+        cpu_name = platform.machine()
+    ram_gb = round(psutil.virtual_memory().total / (1024**3), 1)
+    os_info = f"{platform.system()} {platform.release()}"
+
+    return jsonify({
+        "load_times": {
+            "ratings_ms": round(load_times.get("ratings_ms", 0), 2),
+            "movies_ms": round(load_times.get("movies_ms", 0), 2),
+        },
+        "memory_mb": round(mem_mb, 2),
+        "total_users": num_users,
+        "total_ratings": total_ratings,
+        "distance_time_ms": {
+            "manhattan": round(time_mh, 4),
+            "euclidean": round(time_eu, 4),
+        },
+        "recommendation_time_ms": round(time_rec, 4),
+        "precision_decimals": 4,
+        "hardware": {
+            "cpu": cpu_name or "Desconocido",
+            "ram_gb": ram_gb,
+            "os": os_info,
+            "python_version": sys.version.split()[0],
+        },
+        "knn_parameters": {
+            "param1_similarity": "K vecinos más similares (Manhattan/Euclidean)",
+            "param2_influencer": "Influencer → K usuarios cercanos",
+            "param3_match": "Match directo entre 2 usuarios",
+        }
+    })
+
+
+# ─── Rutas Flask existentes ───────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -328,12 +514,10 @@ def create_user():
     nuevo_id = next_user_id
     next_user_id += 1
 
-    # Guardar el nombre del nuevo usuario en el archivo JSON
     user_names[str(nuevo_id)] = nombre
     with open(NAMES_PATH, "w", encoding="utf-8") as f:
         json.dump(user_names, f, ensure_ascii=False)
 
-    # Validar y construir filas de ratings (solo ratings entre 1 y 5)
     filas = [
         {"userId": nuevo_id, "movieId": int(r["movieId"]), "rating": float(r["rating"])}
         for r in raw_ratings
@@ -343,14 +527,12 @@ def create_user():
     if not filas:
         return jsonify({"error": "Valoraciones inválidas (rango 1-5)"}), 400
 
-    # Persistir ratings en el CSV de usuarios personalizados
     nuevo_df = pd.DataFrame(filas)
     if os.path.exists(CUSTOM_PATH):
         existente = pd.read_csv(CUSTOM_PATH)
         nuevo_df  = pd.concat([existente, nuevo_df], ignore_index=True)
     nuevo_df.to_csv(CUSTOM_PATH, index=False)
 
-    # Recargar todos los datos para que el usuario aparezca de inmediato
     cargar_datos()
 
     return jsonify({"userId": nuevo_id, "name": nombre, "ratingsAdded": len(filas)})

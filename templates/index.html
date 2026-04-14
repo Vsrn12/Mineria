@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CineMatch · KNN Recommender</title>
+  <title>CineMatch · KNN Recommender + Influencer</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
   <style>
@@ -27,35 +27,46 @@
       min-height: 100vh;
     }
 
-    /* ── Navbar ── */
-    .navbar-brand { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.5px; }
-    .navbar-brand span { color: var(--accent); }
-    .navbar { background: var(--surface); border-bottom: 1px solid var(--border); }
-
-    /* ── Tabs ── */
-    .nav-tabs { border-bottom: 2px solid var(--border); }
+    /* TABS - ESTILO CORREGIDO */
+    .nav-tabs {
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+      list-style: none;
+      padding: 0;
+    }
+    .nav-tabs .nav-item {
+      display: inline-block;
+    }
     .nav-tabs .nav-link {
       color: var(--muted);
       border: none;
       padding: .75rem 1.5rem;
       font-weight: 600;
-      transition: color .2s;
-    }
-    .nav-tabs .nav-link:hover { color: var(--text); }
-    .nav-tabs .nav-link.active {
+      transition: all .2s;
       background: transparent;
-      color: var(--accent);
-      border-bottom: 3px solid var(--accent);
+      cursor: pointer;
+      border-radius: 8px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .nav-tabs .nav-link:hover { 
+      color: var(--text); 
+      background: rgba(108,63,197,0.2);
+    }
+    .nav-tabs .nav-link.active {
+      background: var(--primary);
+      color: white;
     }
 
-    /* ── Cards ── */
     .card-dark {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
     }
 
-    /* ── Inputs ── */
     .form-control, .form-select {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -68,49 +79,61 @@
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(108,63,197,.25);
     }
-    .form-control::placeholder { color: var(--muted); }
-    .form-label { color: var(--muted); font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .form-label { 
+      color: var(--muted); 
+      font-size: .85rem; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      letter-spacing: .05em; 
+      margin-bottom: 0.5rem;
+      display: block;
+    }
 
-    /* ── Buttons ── */
     .btn-primary-custom {
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      border: none; color: #fff; font-weight: 700;
-      border-radius: 8px; padding: .6rem 1.4rem;
-      transition: opacity .2s, transform .1s;
+      border: none; 
+      color: #fff; 
+      font-weight: 700;
+      border-radius: 8px; 
+      padding: .6rem 1.4rem;
+      transition: opacity .2s;
+      cursor: pointer;
     }
-    .btn-primary-custom:hover { opacity: .9; transform: translateY(-1px); color: #fff; }
+    .btn-primary-custom:hover { opacity: .8; color: #fff; }
 
     .btn-influencer {
       background: linear-gradient(135deg, #e8374e, #c0203a);
-      border: none; color: #fff; font-weight: 800;
-      border-radius: 10px; padding: .75rem 2rem;
-      font-size: 1.1rem; letter-spacing: .02em;
-      transition: opacity .2s, transform .1s;
-      box-shadow: 0 4px 15px rgba(232,55,78,.35);
+      border: none; 
+      color: #fff; 
+      font-weight: 800;
+      border-radius: 10px; 
+      padding: .75rem 2rem;
+      font-size: 1.1rem;
+      cursor: pointer;
     }
-    .btn-influencer:hover { opacity: .9; transform: translateY(-2px); color: #fff; }
+    .btn-influencer:hover { opacity: .8; color: #fff; }
 
     .btn-outline-custom {
       border: 1px solid var(--border);
       color: var(--muted);
       border-radius: 8px;
       background: transparent;
+      cursor: pointer;
+      padding: .6rem 1rem;
     }
     .btn-outline-custom:hover { border-color: var(--primary); color: var(--text); }
 
-    /* ── Distance tables ── */
-    .dist-table { font-size: .85rem; }
+    .dist-table { font-size: .85rem; width: 100%; }
     .dist-table thead th {
       background: var(--surface2);
       color: var(--muted);
       font-size: .75rem;
       text-transform: uppercase;
-      letter-spacing: .06em;
-      border-bottom: 1px solid var(--border);
+      padding: .55rem .75rem;
     }
-    .dist-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-    .dist-table tbody tr:hover { background: rgba(108,63,197,.12); }
-    .dist-table td, .dist-table th { padding: .55rem .75rem; vertical-align: middle; }
+    .dist-table tbody tr { border-bottom: 1px solid var(--border); }
+    .dist-table td, .dist-table th { padding: .55rem .75rem; }
+    
     .rank-badge {
       display: inline-flex; align-items: center; justify-content: center;
       width: 26px; height: 26px; border-radius: 50%;
@@ -123,27 +146,20 @@
     .dist-value { font-weight: 700; color: var(--accent); }
     .common-badge { font-size: .72rem; color: var(--muted); }
 
-    /* ── Metric badges ── */
-    .badge-manhattan { background: rgba(108,63,197,.3); color: #b39dff; border: 1px solid rgba(108,63,197,.5); }
-    .badge-euclidean { background: rgba(30,150,250,.2); color: #7dd3fc; border: 1px solid rgba(30,150,250,.4); }
+    .badge-manhattan { background: rgba(108,63,197,.3); color: #b39dff; padding: 4px 8px; border-radius: 20px; }
+    .badge-euclidean { background: rgba(30,150,250,.2); color: #7dd3fc; padding: 4px 8px; border-radius: 20px; }
 
-    /* ── Rec cards ── */
     .rec-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      transition: transform .15s, box-shadow .15s;
-      cursor: default;
+      padding: 1rem;
+      transition: transform .15s;
     }
-    .rec-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.4); }
-    .rec-card .card-title { font-size: .85rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .rec-card:hover { transform: translateY(-3px); }
+    .rec-card .card-title { font-size: .85rem; font-weight: 700; color: var(--text); }
     .rec-avg { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
-    .rec-votes { font-size: .72rem; color: var(--muted); }
 
-    /* ── Stars ── */
-    .stars { color: var(--accent); font-size: .9rem; }
-
-    /* ── Movie picker ── */
     .movie-picker {
       max-height: 260px;
       overflow-y: auto;
@@ -155,49 +171,33 @@
       display: flex; align-items: center; gap: .75rem;
       padding: .55rem .9rem;
       border-bottom: 1px solid var(--border);
-      transition: background .12s;
     }
-    .movie-item:last-child { border-bottom: none; }
     .movie-item:hover { background: rgba(108,63,197,.12); }
-    .movie-title { flex: 1; font-size: .85rem; color: var(--text); }
+    .movie-title { flex: 1; font-size: .85rem; }
     .rating-stars button {
       background: none; border: none; cursor: pointer;
       color: var(--border); font-size: 1.1rem;
-      padding: 0 2px; transition: color .1s, transform .1s;
+      padding: 0 2px;
     }
     .rating-stars button:hover, .rating-stars button.lit { color: var(--accent); }
-    .rating-stars button:hover { transform: scale(1.2); }
 
-    /* ── Rating queue ── */
     .queue-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: .45rem .75rem;
       border-bottom: 1px solid var(--border);
       font-size: .83rem;
     }
-    .queue-item:last-child { border-bottom: none; }
     .queue-stars { color: var(--accent); }
 
-    /* ── Utility ── */
-    .section-label {
-      font-size: .72rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .08em; color: var(--muted); margin-bottom: .4rem;
-    }
     .divider { border-color: var(--border); margin: 1.5rem 0; }
     .spinner-border { width: 1.5rem; height: 1.5rem; border-width: .2em; }
-
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--surface2); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    /* ── Toast ── */
-    .toast-container { z-index: 9999; }
-    .toast { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
-
-    /* ── Empty state ── */
     .empty-state { text-align: center; padding: 2.5rem; color: var(--muted); }
     .empty-state i { font-size: 2.5rem; display: block; margin-bottom: .75rem; }
+    .metric-card { background: var(--surface2); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .metric-value { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+
+    .toast-container { z-index: 9999; }
+    .toast { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
 
     @media (max-width: 768px) {
       .nav-tabs .nav-link { padding: .6rem .9rem; font-size: .9rem; }
@@ -206,11 +206,8 @@
 </head>
 <body>
 
-
-
-<!-- Toast -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
-  <div id="mainToast" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
+  <div id="mainToast" class="toast align-items-center" role="alert">
     <div class="d-flex">
       <div class="toast-body" id="toastMsg"></div>
       <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
@@ -220,22 +217,30 @@
 
 <div class="container-fluid px-3 px-md-4 py-4" style="max-width:1400px">
 
-  <!-- Tabs -->
-  <ul class="nav nav-tabs mb-4" id="mainTabs">
+  <!-- TABS - 4 PESTAÑAS -->
+  <ul class="nav nav-tabs" id="mainTabs">
     <li class="nav-item">
-      <button class="nav-link active" data-tab="knn"><i class="bi bi-diagram-3 me-1"></i>KNN & Recomendaciones</button>
+      <button class="nav-link active" data-tab="knn">📊 Similitud por Usuario</button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-tab="create"><i class="bi bi-person-plus me-1"></i>Crear Usuario</button>
+      <button class="nav-link" data-tab="influencer">⭐ Influencer Match</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-tab="create">👤 Crear Usuario</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-tab="complexity">📈 Complejidad</button>
     </li>
   </ul>
 
-  <!-- ═══════════════════ KNN TAB ═══════════════════ -->
-  <div id="tab-knn">
+  <!-- ============================================ -->
+  <!-- TAB 1: KNN -->
+  <!-- ============================================ -->
+  <div id="tab-knn" class="tab-content">
     <div class="row g-3 mb-4">
-      <!-- Controls card -->
       <div class="col-12">
         <div class="card-dark p-4">
+          <h5 class="mb-3">KNN - Vecinos más similares</h5>
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
               <label class="form-label">Usuario</label>
@@ -248,15 +253,15 @@
               <input type="number" class="form-control" id="knnK" value="5" min="1" max="50" />
             </div>
             <div class="col-md-3">
-              <label class="form-label">Métrica activa para Influencer</label>
+              <label class="form-label">Métrica</label>
               <select class="form-select" id="knnMetric">
                 <option value="manhattan">Manhattan</option>
                 <option value="euclidean">Euclidean</option>
               </select>
             </div>
-            <div class="col-md-3 d-flex gap-2">
+            <div class="col-md-3">
               <button class="btn btn-primary-custom w-100" onclick="findNeighbors()">
-                <i class="bi bi-search me-1"></i>Buscar Vecinos
+                Buscar Vecinos
               </button>
             </div>
           </div>
@@ -264,135 +269,221 @@
       </div>
     </div>
 
-    <!-- Distance results -->
     <div id="distancesSection" style="display:none">
       <div class="row g-3 mb-3">
-        <!-- Manhattan -->
         <div class="col-md-6">
-          <div class="card-dark p-3 h-100">
-            <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="badge badge-manhattan px-2 py-1">Manhattan</span>
-              <span class="text-muted" style="font-size:.8rem">Σ |aᵢ − bᵢ|</span>
-            </div>
+          <div class="card-dark p-3">
+            <div class="mb-2"><span class="badge-manhattan">Manhattan</span></div>
             <div id="manhattanTable"></div>
           </div>
         </div>
-        <!-- Euclidean -->
         <div class="col-md-6">
-          <div class="card-dark p-3 h-100">
-            <div class="d-flex align-items-center gap-2 mb-3">
-              <span class="badge badge-euclidean px-2 py-1">Euclidean</span>
-              <span class="text-muted" style="font-size:.8rem">√ Σ (aᵢ − bᵢ)²</span>
-            </div>
+          <div class="card-dark p-3">
+            <div class="mb-2"><span class="badge-euclidean">Euclidean</span></div>
             <div id="euclideanTable"></div>
           </div>
         </div>
       </div>
-
-      <!-- Influencer button -->
       <hr class="divider" />
       <div class="text-center mb-4">
-        <p class="text-muted mb-3" style="font-size:.9rem">
-          Basado en los <strong id="kLabel" class="text-light">5</strong> vecinos más cercanos
-          usando distancia <strong id="metricLabel" class="text-light">Manhattan</strong>
-        </p>
-        <button class="btn btn-influencer" onclick="getInfluencer()">
-          <i class="bi bi-stars me-2"></i>Influencer · Ver Recomendaciones
+        <button class="btn btn-influencer" onclick="getRecommendations()">
+          🎬 Obtener Recomendaciones
         </button>
       </div>
-
-      <!-- Recommendations -->
       <div id="recsSection" style="display:none">
-        <div class="d-flex align-items-center gap-3 mb-3">
-          <h5 class="mb-0"><i class="bi bi-fire text-warning me-2"></i>Películas Recomendadas</h5>
-          <span class="badge bg-secondary" id="recsCount">0</span>
-          <span class="text-muted" style="font-size:.8rem">(valoración vecinos &gt; 3 · umbral)</span>
-        </div>
-        <div id="recsContainer">
-          <div class="empty-state"><i class="bi bi-hourglass-split"></i>Calculando…</div>
-        </div>
+        <h5>Películas Recomendadas <span id="recsCount" class="badge bg-secondary">0</span></h5>
+        <div id="recsContainer" class="row g-2 mt-2"></div>
       </div>
     </div>
-
-    <!-- Initial empty state -->
     <div id="knnEmpty" class="empty-state">
-      <i class="bi bi-people"></i>
-      Selecciona un usuario y la cantidad de vecinos para comenzar
+      <i class="bi bi-people"></i> Selecciona un usuario para comenzar
     </div>
   </div>
 
-  <!-- ═══════════════════ CREATE USER TAB ═══════════════════ -->
-  <div id="tab-create" style="display:none">
+  <!-- ============================================ -->
+  <!-- TAB 2: INFLUENCER MATCH -->
+  <!-- ============================================ -->
+  <div id="tab-influencer" class="tab-content" style="display:none">
     <div class="row g-4">
-      <!-- Form -->
-      <div class="col-lg-5">
-        <div class="card-dark p-4 h-100">
-          <h5 class="mb-4"><i class="bi bi-person-plus-fill text-primary me-2"></i>Nuevo Usuario</h5>
+      <div class="col-lg-6">
+        <div class="card-dark p-4">
+          <h5>🎯 Modo A: Influencer + K vecinos</h5>
+          <hr class="divider">
+          <label class="form-label">Influencer</label>
+          <select class="form-select mb-3" id="infUser">
+            <option value="">Seleccionar influencer</option>
+          </select>
+          <label class="form-label">K (personas a influenciar)</label>
+          <input type="number" class="form-control mb-3" id="infK" value="5" min="1" max="50" />
+          <label class="form-label">Métrica</label>
+          <select class="form-select mb-3" id="infMetric">
+            <option value="manhattan">Manhattan</option>
+            <option value="euclidean">Euclidean</option>
+          </select>
+          <label class="form-label">Umbral de rating (>=)</label>
+          <input type="number" class="form-control mb-3" id="infThreshold" value="3.5" step="0.5" min="1" max="5" />
+          <button class="btn btn-primary-custom w-100" onclick="runInfluencer()">
+            Aplicar Influencia
+          </button>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card-dark p-4">
+          <h5>🤝 Modo B: Match entre 2 usuarios</h5>
+          <hr class="divider">
+          <label class="form-label">Usuario A (Influencer)</label>
+          <select class="form-select mb-3" id="matchUserA">
+            <option value="">Seleccionar usuario</option>
+          </select>
+          <label class="form-label">Usuario B (Receptor)</label>
+          <select class="form-select mb-3" id="matchUserB">
+            <option value="">Seleccionar usuario</option>
+          </select>
+          <label class="form-label">Métrica</label>
+          <select class="form-select mb-3" id="matchMetric">
+            <option value="manhattan">Manhattan</option>
+            <option value="euclidean">Euclidean</option>
+          </select>
+          <label class="form-label">Umbral de rating (>=)</label>
+          <input type="number" class="form-control mb-3" id="matchThreshold" value="3.5" step="0.5" min="1" max="5" />
+          <button class="btn btn-primary-custom w-100" onclick="runMatch()">
+            Match & Recomendar
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="infResults" style="display:none" class="mt-4">
+      <div class="card-dark p-4">
+        <h5 id="infTitle">Resultados</h5>
+        <div id="infNeighbors" class="mb-3"></div>
+        <hr class="divider">
+        <h6>🎬 Recomendaciones</h6>
+        <div id="infRecs" class="row g-2 mt-2"></div>
+      </div>
+    </div>
+  </div>
 
+  <!-- ============================================ -->
+  <!-- TAB 3: CREAR USUARIO -->
+  <!-- ============================================ -->
+  <div id="tab-create" class="tab-content" style="display:none">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="card-dark p-4">
+          <h5>👤 Nuevo Usuario</h5>
+          <hr class="divider">
           <label class="form-label">Nombre de usuario</label>
           <input type="text" class="form-control mb-3" id="newUserName" placeholder="Ej: María García" />
-
           <label class="form-label">Buscar película</label>
-          <div class="position-relative mb-2">
-            <input type="text" class="form-control ps-5" id="movieSearch"
-              placeholder="Escribe el título…" oninput="filterMovies()" />
-            <i class="bi bi-search position-absolute top-50 translate-middle-y ms-3" style="color:var(--muted);left:0"></i>
-          </div>
-
-          <div class="section-label"><span id="movieFoundCount">0</span> resultados</div>
+          <input type="text" class="form-control mb-2" id="movieSearch" placeholder="Escribe el título…" oninput="filterMovies()" />
           <div class="movie-picker" id="moviePicker">
-            <div class="empty-state" style="padding:1.5rem">
-              <i class="bi bi-film" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>
-              Escribe para buscar películas
-            </div>
+            <div class="empty-state">Escribe para buscar películas</div>
           </div>
         </div>
       </div>
-
-      <!-- Queue -->
       <div class="col-lg-7">
-        <div class="card-dark p-4 h-100 d-flex flex-column">
+        <div class="card-dark p-4">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0"><i class="bi bi-list-stars text-warning me-2"></i>Valoraciones</h5>
+            <h5>⭐ Valoraciones</h5>
             <span class="badge bg-secondary" id="queueCount">0 películas</span>
           </div>
-
-          <div class="flex-grow-1 overflow-auto" id="ratingQueue" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);min-height:200px">
+          <div id="ratingQueue" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);min-height:200px">
             <div class="empty-state" id="queueEmpty">
-              <i class="bi bi-star" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>
-              Agrega películas desde el buscador
+              <i class="bi bi-star"></i> Agrega películas desde el buscador
             </div>
           </div>
-
           <div class="mt-4 d-flex gap-2">
-            <button class="btn btn-outline-custom flex-grow-1" onclick="clearQueue()">
-              <i class="bi bi-trash me-1"></i>Limpiar
-            </button>
-            <button class="btn btn-primary-custom flex-grow-1" onclick="submitUser()">
-              <i class="bi bi-check-circle me-1"></i>Crear Usuario
-            </button>
+            <button class="btn btn-outline-custom flex-grow-1" onclick="clearQueue()">Limpiar</button>
+            <button class="btn btn-primary-custom flex-grow-1" onclick="submitUser()">Crear Usuario</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-</div><!-- /container -->
+  <!-- ============================================ -->
+  <!-- TAB 4: COMPLEJIDAD -->
+  <!-- ============================================ -->
+  <div id="tab-complexity" class="tab-content" style="display:none">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="card-dark p-4">
+          <h5>⏱️ Tiempos de Carga</h5>
+          <hr class="divider">
+          <div class="metric-card">
+            <div class="metric-value" id="loadRatings">—</div>
+            <div>ms - ratings.csv</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" id="loadMovies">—</div>
+            <div>ms - movies.csv</div>
+          </div>
+        </div>
+        <div class="card-dark p-4 mt-3">
+          <h5>💾 Memoria</h5>
+          <hr class="divider">
+          <div class="metric-card">
+            <div class="metric-value" id="memSize">—</div>
+            <div>MB - Matriz usuario×película</div>
+          </div>
+          <div><strong>Usuarios:</strong> <span id="totalUsers">—</span></div>
+          <div><strong>Ratings:</strong> <span id="totalRatings">—</span></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card-dark p-4">
+          <h5>⚡ Tiempos de Cómputo</h5>
+          <hr class="divider">
+          <div class="metric-card">
+            <div class="metric-value" id="timeManhattan">—</div>
+            <div>ms - Manhattan</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" id="timeEuclidean">—</div>
+            <div>ms - Euclidiana</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" id="timeRec">—</div>
+            <div>ms - Recomendaciones</div>
+          </div>
+        </div>
+        <div class="card-dark p-4 mt-3">
+          <h5>🖥️ Hardware</h5>
+          <hr class="divider">
+          <div><strong>CPU:</strong> <span id="cpuInfo">—</span></div>
+          <div><strong>RAM:</strong> <span id="ramInfo">—</span> GB</div>
+          <div><strong>Sistema:</strong> <span id="osInfo">—</span></div>
+          <div><strong>Python:</strong> <span id="pyVer">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-dark p-4 mt-3">
+      <h5>📐 Parámetros de Influencia</h5>
+      <hr class="divider">
+      <ul>
+        <li><strong>Parámetro 1:</strong> K vecinos más similares (Manhattan/Euclidean)</li>
+        <li><strong>Parámetro 2:</strong> Influencer → K usuarios cercanos</li>
+        <li><strong>Parámetro 3:</strong> Match directo entre 2 usuarios</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// ─────────────────────────────────────────
-//  State
-// ─────────────────────────────────────────
-let allMovies    = [];
-let ratingQueue  = new Map();   // movieId -> { title, rating }
-let currentUser  = null;
-let lastK        = 5;
-let lastMetric   = 'manhattan';
+// ============================================================
+// VARIABLES GLOBALES
+// ============================================================
+let allMovies = [];
+let ratingQueue = new Map();
+let currentUser = null;
+let lastK = 5;
+let lastMetric = 'manhattan';
 
-// ─────────────────────────────────────────
-//  Boot
-// ─────────────────────────────────────────
+// ============================================================
+// INICIALIZACIÓN
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadUsers();
   loadMovies();
@@ -400,186 +491,296 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupTabs() {
-  document.querySelectorAll('[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const t = btn.dataset.tab;
-      document.getElementById('tab-knn').style.display     = t === 'knn'    ? '' : 'none';
-      document.getElementById('tab-create').style.display  = t === 'create' ? '' : 'none';
+  const tabs = document.querySelectorAll('.nav-link');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function(e) {
+      e.preventDefault();
+      // Quitar active de todos
+      tabs.forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Ocultar todos los contenidos
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+      });
+      
+      // Mostrar el contenido seleccionado
+      const tabId = this.getAttribute('data-tab');
+      const activeTab = document.getElementById(`tab-${tabId}`);
+      if (activeTab) {
+        activeTab.style.display = 'block';
+      }
+      
+      // Cargar complejidad si es necesario
+      if (tabId === 'complexity') {
+        loadComplexity();
+      }
     });
   });
 }
 
-// ─────────────────────────────────────────
-//  Data loading
-// ─────────────────────────────────────────
+// ============================================================
+// API Y UTILS
+// ============================================================
+async function apiFetch(url, body) {
+  const opts = body ? { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify(body) 
+  } : { method: 'GET' };
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function toast(msg, type = 'info') {
+  const el = document.getElementById('mainToast');
+  const body = document.getElementById('toastMsg');
+  body.textContent = msg;
+  const toast = new bootstrap.Toast(el, { delay: 3500 });
+  toast.show();
+}
+
+function setLoading(btn, loading) {
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) { 
+    btn._orig = btn.innerHTML; 
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando…'; 
+  } else if (btn._orig) { 
+    btn.innerHTML = btn._orig; 
+  }
+}
+
+function escHtml(s) { 
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); 
+}
+
+// ============================================================
+// CARGAR DATOS
+// ============================================================
 async function loadUsers() {
   try {
     const data = await apiFetch('/api/users');
-    const sel  = document.getElementById('knnUser');
-    sel.innerHTML = '<option value="">— Seleccionar usuario —</option>';
-    data.forEach(u => {
-      sel.appendChild(new Option(`${u.name}  (ID ${u.userId})`, u.userId));
+    const selects = ['knnUser', 'infUser', 'matchUserA', 'matchUserB'];
+    selects.forEach(selectId => {
+      const select = document.getElementById(selectId);
+      if (select) {
+        select.innerHTML = '<option value="">— Seleccionar —</option>' + 
+          data.map(u => `<option value="${u.userId}">${escHtml(u.name)} (ID ${u.userId})</option>`).join('');
+      }
     });
-  } catch (e) { toast('Error cargando usuarios', 'danger'); }
+  } catch (e) { 
+    toast('Error cargando usuarios', 'danger'); 
+  }
 }
 
 async function loadMovies() {
-  try {
-    allMovies = await apiFetch('/api/movies');
-  } catch (e) {}
+  try { 
+    allMovies = await apiFetch('/api/movies'); 
+  } catch(e) { console.error(e); }
 }
 
-// ─────────────────────────────────────────
-//  KNN
-// ─────────────────────────────────────────
+// ============================================================
+// TAB 1: KNN
+// ============================================================
 async function findNeighbors() {
   const userId = document.getElementById('knnUser').value;
-  const k      = parseInt(document.getElementById('knnK').value) || 5;
-  const metric = document.getElementById('knnMetric').value;
-
+  const k = parseInt(document.getElementById('knnK').value) || 5;
   if (!userId) { toast('Selecciona un usuario', 'warning'); return; }
-
+  
   currentUser = parseInt(userId);
-  lastK       = k;
-  lastMetric  = metric;
-
+  lastK = k;
+  lastMetric = document.getElementById('knnMetric').value;
+  
   const btn = event.currentTarget;
   setLoading(btn, true);
-
+  
   try {
     const data = await apiFetch('/api/knn', { userId: currentUser, k });
-    renderDistanceTable('manhattanTable', data.manhattan, 'manhattan');
-    renderDistanceTable('euclideanTable', data.euclidean, 'euclidean');
-    document.getElementById('kLabel').textContent   = k;
-    document.getElementById('metricLabel').textContent = metric === 'manhattan' ? 'Manhattan' : 'Euclidean';
-    document.getElementById('distancesSection').style.display = '';
-    document.getElementById('knnEmpty').style.display         = 'none';
-    document.getElementById('recsSection').style.display      = 'none';
-  } catch (e) {
-    toast(e.message || 'Error calculando vecinos', 'danger');
-  } finally {
-    setLoading(btn, false);
+    renderDistanceTable('manhattanTable', data.manhattan);
+    renderDistanceTable('euclideanTable', data.euclidean);
+    document.getElementById('distancesSection').style.display = 'block';
+    document.getElementById('knnEmpty').style.display = 'none';
+    document.getElementById('recsSection').style.display = 'none';
+  } catch (e) { 
+    toast(e.message || 'Error', 'danger'); 
+  } finally { 
+    setLoading(btn, false); 
   }
 }
 
-function renderDistanceTable(containerId, data, type) {
+function renderDistanceTable(containerId, data) {
   const container = document.getElementById(containerId);
-  if (!data || data.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding:1.5rem"><i class="bi bi-exclamation-circle"></i>Sin resultados</div>';
-    return;
+  if (!data || data.length === 0) { 
+    container.innerHTML = '<div class="empty-state">Sin resultados</div>'; 
+    return; 
   }
-
-  const rows = data.map((u, i) => {
+  let html = '<table class="table dist-table"><thead><tr><th>#</th><th>Usuario</th><th>Distancia</th></tr></thead><tbody>';
+  data.forEach((u, i) => {
     const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
-    const stars     = starsHtml(u.distance, type);
-    return `
-      <tr>
-        <td><span class="rank-badge ${rankClass}">${i + 1}</span></td>
-        <td>
-          <div style="font-weight:600">${escHtml(u.name)}</div>
-          <div class="common-badge"><i class="bi bi-film me-1"></i>${u.commonMovies} en común</div>
-        </td>
-        <td class="dist-value">${u.distance.toFixed(4)}</td>
-      </tr>`;
-  }).join('');
-
-  container.innerHTML = `
-    <table class="table dist-table mb-0">
-      <thead>
-        <tr>
-          <th>#</th><th>Usuario</th><th>Distancia</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    html += `<tr>
+      <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+      <td><strong>${escHtml(u.name)}</strong><br><small>${u.commonMovies} en común</small></td>
+      <td class="dist-value">${u.distance.toFixed(6)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
-// ─────────────────────────────────────────
-//  Influencer / Recommendations
-// ─────────────────────────────────────────
-async function getInfluencer() {
+async function getRecommendations() {
   if (!currentUser) { toast('Busca vecinos primero', 'warning'); return; }
-
+  
   const btn = event.currentTarget;
   setLoading(btn, true);
-  document.getElementById('recsSection').style.display = '';
-  document.getElementById('recsContainer').innerHTML =
-    '<div class="text-center py-4"><div class="spinner-border text-warning" role="status"></div></div>';
-
+  document.getElementById('recsSection').style.display = 'block';
+  document.getElementById('recsContainer').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning"></div></div>';
+  
   try {
-    const data = await apiFetch('/api/recommend', {
-      userId: currentUser,
-      k:      lastK,
-      metric: lastMetric,
+    const data = await apiFetch('/api/recommend', { 
+      userId: currentUser, k: lastK, metric: lastMetric 
     });
-    renderRecommendations(data.recommendations);
-    document.getElementById('recsCount').textContent = data.recommendations.length;
-    document.getElementById('recsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (e) {
-    toast(e.message || 'Error obteniendo recomendaciones', 'danger');
-    document.getElementById('recsContainer').innerHTML = '<div class="empty-state"><i class="bi bi-x-circle text-danger"></i>Error calculando recomendaciones</div>';
-  } finally {
-    setLoading(btn, false);
-  }
-}
-
-function renderRecommendations(recs) {
-  const container = document.getElementById('recsContainer');
-  if (!recs || recs.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i class="bi bi-emoji-frown"></i>
-        Sin recomendaciones. Los vecinos no han valorado con más de 3 películas que no hayas visto.
+    const recs = data.recommendations;
+    document.getElementById('recsCount').textContent = recs.length;
+    
+    if (recs.length === 0) { 
+      document.getElementById('recsContainer').innerHTML = '<div class="empty-state">Sin recomendaciones</div>'; 
+      return; 
+    }
+    
+    let html = '';
+    recs.forEach(r => {
+      html += `<div class="col-6 col-md-4 col-lg-3">
+        <div class="rec-card">
+          <div class="card-title">${escHtml(r.title)}</div>
+          <div class="rec-avg">${r.avgRating.toFixed(2)}/5</div>
+          <small>${r.numVotes} votos</small>
+        </div>
       </div>`;
-    return;
+    });
+    document.getElementById('recsContainer').innerHTML = html;
+  } catch (e) { 
+    toast(e.message, 'danger'); 
+  } finally { 
+    setLoading(btn, false); 
   }
-
-  const cards = recs.map(r => `
-    <div class="col-6 col-md-4 col-lg-3 col-xl-2">
-      <div class="rec-card p-3 h-100">
-        <div class="card-title">${escHtml(r.title)}</div>
-        <div class="rec-avg mt-2">${r.avgRating.toFixed(2)}<span style="font-size:.7rem;color:var(--muted)"> /5</span></div>
-        <div class="stars mt-1">${starsFull(r.avgRating)}</div>
-        <div class="rec-votes mt-1"><i class="bi bi-people-fill me-1"></i>${r.numVotes} vecino${r.numVotes > 1 ? 's' : ''}</div>
-      </div>
-    </div>`).join('');
-
-  container.innerHTML = `<div class="row g-2">${cards}</div>`;
 }
 
-// ─────────────────────────────────────────
-//  Create User
-// ─────────────────────────────────────────
+// ============================================================
+// TAB 2: INFLUENCER
+// ============================================================
+async function runInfluencer() {
+  const userId = document.getElementById('infUser').value;
+  const k = parseInt(document.getElementById('infK').value);
+  const metric = document.getElementById('infMetric').value;
+  const threshold = parseFloat(document.getElementById('infThreshold').value);
+  
+  if (!userId) { toast('Selecciona un influencer', 'warning'); return; }
+  
+  const btn = event.currentTarget;
+  setLoading(btn, true);
+  
+  try {
+    const data = await apiFetch('/api/influencer', { 
+      influencerId: parseInt(userId), k, metric, threshold 
+    });
+    
+    document.getElementById('infResults').style.display = 'block';
+    document.getElementById('infTitle').innerHTML = `🎯 ${escHtml(data.influencerName)} influye a ${data.k} personas (${data.metric})`;
+    document.getElementById('infNeighbors').innerHTML = `<strong>Vecinos influenciados:</strong> ${data.neighbors.map(n => n.name).join(', ')}`;
+    
+    if (data.recommendations.length === 0) {
+      document.getElementById('infRecs').innerHTML = '<div class="empty-state">Sin recomendaciones</div>';
+    } else {
+      let html = '';
+      data.recommendations.forEach(r => {
+        html += `<div class="col-6 col-md-4 col-lg-3">
+          <div class="rec-card">
+            <div class="card-title">${escHtml(r.title)}</div>
+            <div class="rec-avg">${r.avgRating.toFixed(2)}/5</div>
+            <small>${r.numVotes} usuarios</small>
+          </div>
+        </div>`;
+      });
+      document.getElementById('infRecs').innerHTML = html;
+    }
+  } catch (e) { 
+    toast(e.message, 'danger'); 
+  } finally { 
+    setLoading(btn, false); 
+  }
+}
+
+async function runMatch() {
+  const userA = document.getElementById('matchUserA').value;
+  const userB = document.getElementById('matchUserB').value;
+  const metric = document.getElementById('matchMetric').value;
+  const threshold = parseFloat(document.getElementById('matchThreshold').value);
+  
+  if (!userA || !userB) { toast('Selecciona ambos usuarios', 'warning'); return; }
+  if (userA === userB) { toast('Deben ser usuarios diferentes', 'warning'); return; }
+  
+  const btn = event.currentTarget;
+  setLoading(btn, true);
+  
+  try {
+    const data = await apiFetch('/api/match', { 
+      userA: parseInt(userA), userB: parseInt(userB), metric, threshold 
+    });
+    
+    document.getElementById('infResults').style.display = 'block';
+    document.getElementById('infTitle').innerHTML = `🤝 Match: ${escHtml(data.userAName)} → ${escHtml(data.userBName)} (distancia: ${data.distance.toFixed(6)})`;
+    document.getElementById('infNeighbors').innerHTML = `<strong>Películas en común:</strong> ${data.commonMovies}`;
+    
+    if (data.recommendations.length === 0) {
+      document.getElementById('infRecs').innerHTML = '<div class="empty-state">Sin recomendaciones</div>';
+    } else {
+      let html = '';
+      data.recommendations.forEach(r => {
+        html += `<div class="col-6 col-md-4 col-lg-3">
+          <div class="rec-card">
+            <div class="card-title">${escHtml(r.title)}</div>
+            <div class="rec-avg">${r.influencerRating.toFixed(2)}/5</div>
+          </div>
+        </div>`;
+      });
+      document.getElementById('infRecs').innerHTML = html;
+    }
+  } catch (e) { 
+    toast(e.message, 'danger'); 
+  } finally { 
+    setLoading(btn, false); 
+  }
+}
+
+// ============================================================
+// TAB 3: CREAR USUARIO
+// ============================================================
 function filterMovies() {
-  const q     = document.getElementById('movieSearch').value.trim().toLowerCase();
+  const q = document.getElementById('movieSearch').value.trim().toLowerCase();
   const picker = document.getElementById('moviePicker');
-  const countEl = document.getElementById('movieFoundCount');
-
   if (q.length < 2) {
-    picker.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="bi bi-film" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>Escribe al menos 2 caracteres</div>`;
-    countEl.textContent = '0';
+    picker.innerHTML = '<div class="empty-state">Escribe al menos 2 caracteres</div>';
     return;
   }
-
   const results = allMovies.filter(m => m.title.toLowerCase().includes(q)).slice(0, 60);
-  countEl.textContent = results.length;
-
   if (results.length === 0) {
-    picker.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="bi bi-search" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>Sin resultados</div>`;
+    picker.innerHTML = '<div class="empty-state">Sin resultados</div>';
     return;
   }
-
-  picker.innerHTML = results.map(m => `
-    <div class="movie-item" data-id="${m.movieId}" data-title="${escAttr(m.title)}">
+  let html = '';
+  results.forEach(m => {
+    html += `<div class="movie-item">
       <span class="movie-title">${escHtml(m.title)}</span>
       <div class="rating-stars" data-id="${m.movieId}">
-        ${[1,2,3,4,5].map(n => `<button onclick="rateMovie(${m.movieId}, '${escAttr(m.title)}', ${n}, this)" title="${n}★"><i class="bi bi-star-fill"></i></button>`).join('')}
+        ${[1,2,3,4,5].map(n => `<button onclick="rateMovie(${m.movieId}, '${escHtml(m.title)}', ${n}, this)">★</button>`).join('')}
       </div>
-    </div>`).join('');
-
-  // Pre-light already-rated movies
+    </div>`;
+  });
+  picker.innerHTML = html;
   ratingQueue.forEach((v, id) => {
     const stars = picker.querySelector(`.rating-stars[data-id="${id}"]`);
     if (stars) lightStars(stars, v.rating);
@@ -588,49 +789,47 @@ function filterMovies() {
 
 function rateMovie(movieId, title, rating, clickedBtn) {
   ratingQueue.set(movieId, { title, rating });
-  const starContainer = clickedBtn.closest('.rating-stars');
-  lightStars(starContainer, rating);
+  lightStars(clickedBtn.closest('.rating-stars'), rating);
   renderQueue();
 }
 
 function lightStars(container, rating) {
-  container.querySelectorAll('button').forEach((btn, i) => {
-    btn.classList.toggle('lit', i < rating);
+  const btns = container.querySelectorAll('button');
+  btns.forEach((btn, i) => {
+    if (i < rating) btn.classList.add('lit');
+    else btn.classList.remove('lit');
   });
 }
 
 function renderQueue() {
-  const queue = document.getElementById('ratingQueue');
+  const queueDiv = document.getElementById('ratingQueue');
   const empty = document.getElementById('queueEmpty');
   const count = document.getElementById('queueCount');
-
   count.textContent = `${ratingQueue.size} película${ratingQueue.size !== 1 ? 's' : ''}`;
-
   if (ratingQueue.size === 0) {
-    empty.style.display = '';
-    queue.querySelectorAll('.queue-item').forEach(el => el.remove());
+    if (empty) empty.style.display = '';
+    const items = queueDiv.querySelectorAll('.queue-item');
+    items.forEach(el => el.remove());
     return;
   }
-  empty.style.display = 'none';
-
-  const items = [...ratingQueue.entries()].map(([id, v]) => `
-    <div class="queue-item">
-      <span style="flex:1;font-size:.82rem">${escHtml(v.title)}</span>
-      <span class="queue-stars me-2">${'★'.repeat(v.rating)}${'☆'.repeat(5 - v.rating)}</span>
-      <button onclick="removeFromQueue(${id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>`).join('');
-
-  // Replace all queue-items
-  queue.querySelectorAll('.queue-item').forEach(el => el.remove());
-  queue.insertAdjacentHTML('beforeend', items);
+  if (empty) empty.style.display = 'none';
+  const existing = queueDiv.querySelectorAll('.queue-item');
+  existing.forEach(el => el.remove());
+  let html = '';
+  ratingQueue.forEach((v, id) => {
+    html += `<div class="queue-item">
+      <span>${escHtml(v.title)}</span>
+      <span class="queue-stars">${'★'.repeat(v.rating)}${'☆'.repeat(5 - v.rating)}</span>
+      <button onclick="removeFromQueue(${id})" style="background:none;border:none;color:#888;cursor:pointer">✖</button>
+    </div>`;
+  });
+  queueDiv.insertAdjacentHTML('beforeend', html);
 }
 
 function removeFromQueue(movieId) {
   ratingQueue.delete(movieId);
   renderQueue();
-  filterMovies(); // refresh stars in picker
+  filterMovies();
 }
 
 function clearQueue() {
@@ -641,81 +840,50 @@ function clearQueue() {
 
 async function submitUser() {
   const name = document.getElementById('newUserName').value.trim();
-  if (!name) { toast('Escribe un nombre de usuario', 'warning'); return; }
-  if (ratingQueue.size === 0) { toast('Agrega al menos una valoración', 'warning'); return; }
-
-  const ratings = [...ratingQueue.entries()].map(([movieId, v]) => ({ movieId, rating: v.rating }));
+  if (!name) { toast('Escribe un nombre', 'warning'); return; }
+  if (ratingQueue.size === 0) { toast('Agrega valoraciones', 'warning'); return; }
+  
+  const ratings = [...ratingQueue.entries()].map(([mid, v]) => ({ movieId: mid, rating: v.rating }));
   const btn = event.currentTarget;
   setLoading(btn, true);
-
+  
   try {
     const data = await apiFetch('/api/users', { name, ratings });
-    toast(`✅ Usuario "${data.name}" (ID ${data.userId}) creado con ${data.ratingsAdded} valoraciones`, 'success');
+    toast(`✅ Usuario "${data.name}" (ID ${data.userId}) creado`, 'success');
     document.getElementById('newUserName').value = '';
     document.getElementById('movieSearch').value = '';
     clearQueue();
-    document.getElementById('moviePicker').innerHTML = '';
-    document.getElementById('movieFoundCount').textContent = '0';
+    document.getElementById('moviePicker').innerHTML = '<div class="empty-state">Escribe para buscar películas</div>';
     await loadUsers();
-  } catch (e) {
-    toast(e.message || 'Error creando usuario', 'danger');
-  } finally {
-    setLoading(btn, false);
+  } catch (e) { 
+    toast(e.message, 'danger'); 
+  } finally { 
+    setLoading(btn, false); 
   }
 }
 
-// ─────────────────────────────────────────
-//  Utils
-// ─────────────────────────────────────────
-async function apiFetch(url, body) {
-  const opts = body
-    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    : { method: 'GET' };
-  const res = await fetch(url, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return data;
-}
-
-function toast(msg, type = 'info') {
-  const el   = document.getElementById('mainToast');
-  const body = document.getElementById('toastMsg');
-  body.textContent = msg;
-  el.className = `toast align-items-center text-bg-${type === 'success' ? 'success' : type === 'danger' ? 'danger' : type === 'warning' ? 'warning' : 'secondary'} border-0`;
-  bootstrap.Toast.getOrCreateInstance(el, { delay: 3500 }).show();
-}
-
-function setLoading(btn, loading) {
-  btn.disabled = loading;
-  if (loading) {
-    btn._orig = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Calculando…';
-  } else if (btn._orig) {
-    btn.innerHTML = btn._orig;
+// ============================================================
+// TAB 4: COMPLEJIDAD
+// ============================================================
+async function loadComplexity() {
+  try {
+    const data = await apiFetch('/api/complexity');
+    document.getElementById('loadRatings').textContent = data.load_times.ratings_ms.toFixed(2);
+    document.getElementById('loadMovies').textContent = data.load_times.movies_ms.toFixed(2);
+    document.getElementById('memSize').textContent = data.memory_mb.toFixed(2);
+    document.getElementById('totalUsers').textContent = data.total_users;
+    document.getElementById('totalRatings').textContent = data.total_ratings;
+    document.getElementById('timeManhattan').textContent = data.distance_time_ms.manhattan.toFixed(4);
+    document.getElementById('timeEuclidean').textContent = data.distance_time_ms.euclidean.toFixed(4);
+    document.getElementById('timeRec').textContent = data.recommendation_time_ms.toFixed(4);
+    document.getElementById('cpuInfo').textContent = data.hardware.cpu;
+    document.getElementById('ramInfo').textContent = data.hardware.ram_gb;
+    document.getElementById('osInfo').textContent = data.hardware.os;
+    document.getElementById('pyVer').textContent = data.hardware.python_version;
+  } catch(e) { 
+    console.error(e);
+    toast('Error cargando métricas', 'danger');
   }
-}
-
-function starsFull(rating) {
-  const full  = Math.floor(rating);
-  const half  = rating - full >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return (
-    '<i class="bi bi-star-fill"></i>'.repeat(full) +
-    (half ? '<i class="bi bi-star-half"></i>' : '') +
-    '<i class="bi bi-star" style="opacity:.3"></i>'.repeat(empty)
-  );
-}
-
-function starsHtml(dist, type) { return ''; }
-
-function escHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function escAttr(s) {
-  return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 </script>
 </body>
