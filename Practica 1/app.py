@@ -117,7 +117,7 @@ def cargar_datos():
 cargar_datos()
 
 
-# ─── Fórmulas de distancia (Python puro, sin librerías) ───────────────────────
+# ─── Fórmulas de distancia ─────────────────────
 
 def distancia_manhattan(ratings_a, ratings_b):
     """Distancia Manhattan entre dos usuarios.

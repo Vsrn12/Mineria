@@ -1,0 +1,20 @@
+# Dataset — demasiado pesado para el repositorio
+*.csv
+
+# Entorno virtual Python
+venv/
+.venv/
+env/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Variables de entorno
+.env

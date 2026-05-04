@@ -179,6 +179,10 @@
       color: var(--border); font-size: 1.1rem;
       padding: 0 2px;
     }
+    .rating-stars button i,
+    .queue-stars i {
+      pointer-events: none;
+    }
     .rating-stars button:hover, .rating-stars button.lit { color: var(--accent); }
 
     .queue-item {
@@ -220,16 +224,16 @@
   <!-- TABS - 4 PESTAÑAS -->
   <ul class="nav nav-tabs" id="mainTabs">
     <li class="nav-item">
-      <button class="nav-link active" data-tab="knn">📊 Similitud por Usuario</button>
+      <button class="nav-link active" data-tab="knn">Similitud por Usuario</button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-tab="influencer">⭐ Influencer Match</button>
+      <button class="nav-link" data-tab="influencer">Influencer Match</button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-tab="create">👤 Crear Usuario</button>
+      <button class="nav-link" data-tab="create">Crear Usuario</button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-tab="complexity">📈 Complejidad</button>
+      <button class="nav-link" data-tab="complexity">Complejidad</button>
     </li>
   </ul>
 
@@ -287,7 +291,7 @@
       <hr class="divider" />
       <div class="text-center mb-4">
         <button class="btn btn-influencer" onclick="getRecommendations()">
-          🎬 Obtener Recomendaciones
+          Obtener Recomendaciones
         </button>
       </div>
       <div id="recsSection" style="display:none">
@@ -307,7 +311,7 @@
     <div class="row g-4">
       <div class="col-lg-6">
         <div class="card-dark p-4">
-          <h5>🎯 Modo A: Influencer + K vecinos</h5>
+          <h5>Modo A: Influencer + K vecinos</h5>
           <hr class="divider">
           <label class="form-label">Influencer</label>
           <select class="form-select mb-3" id="infUser">
@@ -329,7 +333,7 @@
       </div>
       <div class="col-lg-6">
         <div class="card-dark p-4">
-          <h5>🤝 Modo B: Match entre 2 usuarios</h5>
+          <h5>Modo B: Match entre 2 usuarios</h5>
           <hr class="divider">
           <label class="form-label">Usuario A (Influencer)</label>
           <select class="form-select mb-3" id="matchUserA">
@@ -357,7 +361,7 @@
         <h5 id="infTitle">Resultados</h5>
         <div id="infNeighbors" class="mb-3"></div>
         <hr class="divider">
-        <h6>🎬 Recomendaciones</h6>
+        <h6>Recomendaciones</h6>
         <div id="infRecs" class="row g-2 mt-2"></div>
       </div>
     </div>
@@ -370,7 +374,7 @@
     <div class="row g-4">
       <div class="col-lg-5">
         <div class="card-dark p-4">
-          <h5>👤 Nuevo Usuario</h5>
+          <h5>Nuevo Usuario</h5>
           <hr class="divider">
           <label class="form-label">Nombre de usuario</label>
           <input type="text" class="form-control mb-3" id="newUserName" placeholder="Ej: María García" />
@@ -384,7 +388,7 @@
       <div class="col-lg-7">
         <div class="card-dark p-4">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5>⭐ Valoraciones</h5>
+            <h5>Valoraciones</h5>
             <span class="badge bg-secondary" id="queueCount">0 películas</span>
           </div>
           <div id="ratingQueue" style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);min-height:200px">
@@ -408,7 +412,7 @@
     <div class="row g-4">
       <div class="col-md-6">
         <div class="card-dark p-4">
-          <h5>⏱️ Tiempos de Carga</h5>
+          <h5>Tiempos de Carga</h5>
           <hr class="divider">
           <div class="metric-card">
             <div class="metric-value" id="loadRatings">—</div>
@@ -420,7 +424,7 @@
           </div>
         </div>
         <div class="card-dark p-4 mt-3">
-          <h5>💾 Memoria</h5>
+          <h5>Memoria</h5>
           <hr class="divider">
           <div class="metric-card">
             <div class="metric-value" id="memSize">—</div>
@@ -432,7 +436,7 @@
       </div>
       <div class="col-md-6">
         <div class="card-dark p-4">
-          <h5>⚡ Tiempos de Cómputo</h5>
+          <h5>Tiempos de Cómputo</h5>
           <hr class="divider">
           <div class="metric-card">
             <div class="metric-value" id="timeManhattan">—</div>
@@ -448,7 +452,7 @@
           </div>
         </div>
         <div class="card-dark p-4 mt-3">
-          <h5>🖥️ Hardware</h5>
+          <h5>Hardware</h5>
           <hr class="divider">
           <div><strong>CPU:</strong> <span id="cpuInfo">—</span></div>
           <div><strong>RAM:</strong> <span id="ramInfo">—</span> GB</div>
@@ -458,11 +462,11 @@
       </div>
     </div>
     <div class="card-dark p-4 mt-3">
-      <h5>📐 Parámetros de Influencia</h5>
+      <h5>Parámetros de Influencia</h5>
       <hr class="divider">
       <ul>
         <li><strong>Parámetro 1:</strong> K vecinos más similares (Manhattan/Euclidean)</li>
-        <li><strong>Parámetro 2:</strong> Influencer → K usuarios cercanos</li>
+        <li><strong>Parámetro 2:</strong> Influencer -> K usuarios cercanos</li>
         <li><strong>Parámetro 3:</strong> Match directo entre 2 usuarios</li>
       </ul>
     </div>
@@ -689,7 +693,7 @@ async function runInfluencer() {
     });
     
     document.getElementById('infResults').style.display = 'block';
-    document.getElementById('infTitle').innerHTML = `🎯 ${escHtml(data.influencerName)} influye a ${data.k} personas (${data.metric})`;
+    document.getElementById('infTitle').innerHTML = `${escHtml(data.influencerName)} influye a ${data.k} personas (${data.metric})`;
     document.getElementById('infNeighbors').innerHTML = `<strong>Vecinos influenciados:</strong> ${data.neighbors.map(n => n.name).join(', ')}`;
     
     if (data.recommendations.length === 0) {
@@ -732,7 +736,7 @@ async function runMatch() {
     });
     
     document.getElementById('infResults').style.display = 'block';
-    document.getElementById('infTitle').innerHTML = `🤝 Match: ${escHtml(data.userAName)} → ${escHtml(data.userBName)} (distancia: ${data.distance.toFixed(6)})`;
+    document.getElementById('infTitle').innerHTML = `Match: ${escHtml(data.userAName)} -> ${escHtml(data.userBName)} (distancia: ${data.distance.toFixed(6)})`;
     document.getElementById('infNeighbors').innerHTML = `<strong>Películas en común:</strong> ${data.commonMovies}`;
     
     if (data.recommendations.length === 0) {
@@ -776,7 +780,7 @@ function filterMovies() {
     html += `<div class="movie-item">
       <span class="movie-title">${escHtml(m.title)}</span>
       <div class="rating-stars" data-id="${m.movieId}">
-        ${[1,2,3,4,5].map(n => `<button onclick="rateMovie(${m.movieId}, '${escHtml(m.title)}', ${n}, this)">★</button>`).join('')}
+        ${[1,2,3,4,5].map(n => `<button onclick="rateMovie(${m.movieId}, '${escHtml(m.title)}', ${n}, this)"><i class="bi bi-star-fill"></i></button>`).join('')}
       </div>
     </div>`;
   });
@@ -816,11 +820,13 @@ function renderQueue() {
   const existing = queueDiv.querySelectorAll('.queue-item');
   existing.forEach(el => el.remove());
   let html = '';
+  const filledStar = '<i class="bi bi-star-fill"></i>';
+  const emptyStar = '<i class="bi bi-star"></i>';
   ratingQueue.forEach((v, id) => {
     html += `<div class="queue-item">
       <span>${escHtml(v.title)}</span>
-      <span class="queue-stars">${'★'.repeat(v.rating)}${'☆'.repeat(5 - v.rating)}</span>
-      <button onclick="removeFromQueue(${id})" style="background:none;border:none;color:#888;cursor:pointer">✖</button>
+      <span class="queue-stars">${filledStar.repeat(v.rating)}${emptyStar.repeat(5 - v.rating)}</span>
+      <button onclick="removeFromQueue(${id})" style="background:none;border:none;color:#888;cursor:pointer">X</button>
     </div>`;
   });
   queueDiv.insertAdjacentHTML('beforeend', html);
@@ -849,7 +855,7 @@ async function submitUser() {
   
   try {
     const data = await apiFetch('/api/users', { name, ratings });
-    toast(`✅ Usuario "${data.name}" (ID ${data.userId}) creado`, 'success');
+    toast(`Usuario "${data.name}" (ID ${data.userId}) creado`, 'success');
     document.getElementById('newUserName').value = '';
     document.getElementById('movieSearch').value = '';
     clearQueue();
