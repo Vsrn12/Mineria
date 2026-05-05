@@ -270,8 +270,8 @@ def api_partida(match_id):
             v = row[col_d]
             stats_d[base] = None if (isinstance(v, float) and math.isnan(v)) else round(float(v), 4)
 
-    heroes_r = extraer_heroes_equipo(row, "r")[:10]
-    heroes_d = extraer_heroes_equipo(row, "d")[:10]
+    heroes_r = extraer_heroes_equipo(row, "r")[:5]
+    heroes_d = extraer_heroes_equipo(row, "d")[:5]
 
     # Tamaño de la ventana histórica de cada equipo (freq = número de partidas promediadas)
     freq_r = row.get("freq_r")
