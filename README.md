@@ -256,7 +256,6 @@ pip install -r requirements.txt
 # 2. Colocar tb_pro_players_matches.csv en la carpeta Final/
 
 # 3. Iniciar el servidor
-cd Final
 python app.py
 ```
 
