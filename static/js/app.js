@@ -105,6 +105,7 @@ function heroFallback(size = 84) {
 // sin pasar HTML en atributos data-* (eso rompe los estilos al escapar < >).
 let metaHeroes  = [];
 let metaCargada = false;
+let graficosInit = false;  // charts solo se crean una vez
 
 // Construye el HTML del popover rico de un héroe (se llama via content() de Bootstrap)
 function buildHeroPopover(h, rank) {
@@ -157,6 +158,8 @@ document.getElementById('mainNav').addEventListener('click', e => {
   document.getElementById(btn.dataset.tab).classList.add('active');
   // Auto-cargar la primera vez que se abre la pestaña de héroes
   if (btn.dataset.tab === 'tab-meta' && !metaCargada) cargarMeta();
+  // Auto-cargar gráficos la primera vez
+  if (btn.dataset.tab === 'tab-graficos' && !graficosInit) cargarGraficos();
 });
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
@@ -317,13 +320,73 @@ async function cargarMeta() {
 }
 
 // ─── TAB 3: Detalle de Partida ────────────────────────────────────────────────
+
+// Grupos de estadísticas para el detalle de partida
+const STAT_GROUPS = [
+  { nombre: 'Rendimiento',    icono: 'bi-trophy',        keys: ['win_pct','kda_avg','hero_kills_avg','deaths_avg','assists_avg','kills_per_min_avg'] },
+  { nombre: 'Economía',       icono: 'bi-coin',          keys: ['gold_per_min_avg','xp_per_min_avg','total_gold_avg','gold_spent_avg','last_hits_avg','gold_avg'] },
+  { nombre: 'Combate',        icono: 'bi-lightning-fill',keys: ['hero_damage_avg','hero_healing_avg','firstblood_claimed_avg','buyback_count_avg','courier_kills_avg'] },
+  { nombre: 'Objetivos',      icono: 'bi-flag-fill',     keys: ['tower_kills_avg','tower_damage_avg','roshan_kills_avg','ancient_kills_avg','neutral_kills_avg'] },
+  { nombre: 'Visión de mapa', icono: 'bi-eye',           keys: ['observer_uses_avg','observer_kills_avg','sentry_uses_avg','sentry_kills_avg'] },
+  { nombre: 'Detalles',       icono: 'bi-three-dots',    keys: ['duration_avg_win','duration_avg_lose','actions_per_min_avg','level_avg','purchase_tpscroll_avg','lane_kills_avg','denies_avg','necronomicon_kills_avg'] },
+];
+
+// Genera una fila de stat comparativa (Radiant | label+bar | Dire)
+function statRow(key, cfg, vr, vd) {
+  const nr   = fmtStat(key, vr);
+  const nd   = fmtStat(key, vd);
+  const rawR = vr != null ? (cfg.transform ? cfg.transform(+vr) : +vr) : 0;
+  const rawD = vd != null ? (cfg.transform ? cfg.transform(+vd) : +vd) : 0;
+  const sumv = rawR + rawD;
+  const pctR = sumv > 0 ? Math.round((rawR / sumv) * 100) : 50;
+  const pctD = 100 - pctR;
+  return `
+    <div class="stat-row" title="${escAttr(cfg.tooltip)}">
+      <span class="stat-val-r">${nr}</span>
+      <div class="stat-mid">
+        <div class="stat-label">${cfg.label}</div>
+        <div class="stat-bar">
+          <div style="width:${pctR}%;background:var(--dota-radiant)"></div>
+          <div style="width:${pctD}%;background:var(--dota-dire)"></div>
+        </div>
+      </div>
+      <span class="stat-val-d">${nd}</span>
+    </div>`;
+}
+
+// Lista de héroes (5 máximo)
+function heroesHtml(heroes, color) {
+  if (!heroes || heroes.length === 0) {
+    return `<div style="padding:.75rem;font-size:.75rem;color:var(--dota-muted);font-style:italic;text-align:center">
+      <i class="bi bi-exclamation-triangle me-1"></i>Sin datos de héroes</div>`;
+  }
+  return heroes.map(h => {
+    const pr    = h.frecuencia;
+    const prPct = Math.min(100, Math.round(pr * 100));
+    return `
+    <div class="hero-list-row">
+      ${h.icono
+        ? `<img src="${h.icono}" loading="lazy" decoding="async" class="hero-detail-img" alt="${h.nombre}" onerror="this.replaceWith(heroFallback(40))">`
+        : `<div class="hero-detail-fallback"><i class="bi bi-shield-fill"></i></div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.8rem;font-weight:600;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.nombre}</div>
+        <div style="display:flex;align-items:center;gap:.35rem;margin-top:2px">
+          <div style="flex:1;height:3px;background:var(--dota-border);border-radius:2px;overflow:hidden">
+            <div style="width:${prPct}%;height:100%;background:${color};opacity:.7;border-radius:2px"></div>
+          </div>
+          <span style="font-size:.6rem;color:var(--dota-muted);white-space:nowrap">${prPct}% picks</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function cargarDetalle(matchId) {
   const id   = matchId ?? document.getElementById('inputMatchDetalle').value.trim();
   const cont = document.getElementById('detalleContenido');
   if (!id) return;
 
   cont.innerHTML = '<div class="spinner-dota"></div>';
-
   const r = await fetch(`/api/partida/${id}`);
   if (!r.ok) {
     cont.innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-triangle"></i>Partida ${id} no encontrada</div>`;
@@ -331,125 +394,100 @@ async function cargarDetalle(matchId) {
   }
   const d = await r.json();
 
-  // Filas de estadísticas comparativas usando STAT_CONFIG
-  const filaStats = Object.entries(STAT_CONFIG).map(([key, cfg]) => {
+  // ── Key stats destacados (6 métricas principales en tarjetas grandes) ──────
+  const KEY_STATS = ['win_pct','kda_avg','gold_per_min_avg','xp_per_min_avg','hero_kills_avg','tower_kills_avg'];
+  const keyStatsHtml = KEY_STATS.map(key => {
+    const cfg = STAT_CONFIG[key];
+    if (!cfg) return '';
     const vr = d.radiant?.stats?.[key];
     const vd = d.dire?.stats?.[key];
     const nr = fmtStat(key, vr);
     const nd = fmtStat(key, vd);
-
-    // Calcular proporción para la barra comparativa (valores transformados)
     const rawR = vr != null ? (cfg.transform ? cfg.transform(+vr) : +vr) : 0;
     const rawD = vd != null ? (cfg.transform ? cfg.transform(+vd) : +vd) : 0;
     const sumv = rawR + rawD;
     const pctR = sumv > 0 ? Math.round((rawR / sumv) * 100) : 50;
-    const pctD = 100 - pctR;
-
     return `
-      <div class="stat-row" title="${escAttr(cfg.tooltip)}">
-        <span class="stat-val-r" style="width:100px;text-align:right">${nr}</span>
-        <div style="flex:1;padding:0 1rem">
-          <div class="stat-label" style="text-align:center;margin-bottom:3px">${cfg.label}</div>
-          <div style="display:flex;height:5px;border-radius:3px;overflow:hidden">
-            <div style="width:${pctR}%;background:var(--dota-radiant)"></div>
-            <div style="width:${pctD}%;background:var(--dota-dire)"></div>
-          </div>
+      <div class="key-stat-card" title="${escAttr(cfg.tooltip)}">
+        <div class="ks-label">${cfg.label}</div>
+        <div class="ks-values">
+          <span class="ks-r">${nr}</span>
+          <span class="ks-sep">vs</span>
+          <span class="ks-d">${nd}</span>
         </div>
-        <span class="stat-val-d" style="width:100px;text-align:left">${nd}</span>
+        <div class="ks-bar">
+          <div style="width:${pctR}%;background:var(--dota-radiant)"></div>
+          <div style="width:${100-pctR}%;background:var(--dota-dire)"></div>
+        </div>
       </div>`;
   }).join('');
 
-  // Lista de héroes con imagen circular y pick rate visual
-  // El número 0.067 = héroe elegido en el 6.7% de las partidas del equipo
-  // (ej: 1 partido de cada 15 en la ventana de historial)
-  const heroesHtml = (heroes, color) => {
-    if (!heroes || heroes.length === 0) {
-      return `<div style="padding:.75rem;font-size:.75rem;color:var(--dota-muted);font-style:italic;text-align:center">
-        <i class="bi bi-exclamation-triangle me-1"></i>Sin datos de héroes para este equipo<br>
-        <span style="font-size:.65rem">(~6% de partidas en el dataset no tienen historial de picks)</span>
-      </div>`;
-    }
-    return heroes.map(h => {
-    const pr    = h.frecuencia;
-    const prPct = Math.min(100, Math.round(pr * 100));
+  // ── Grupos de estadísticas ────────────────────────────────────────────────
+  const gruposHtml = STAT_GROUPS.map((g, gi) => {
+    const filas = g.keys.map(key => {
+      const cfg = STAT_CONFIG[key];
+      if (!cfg) return '';
+      return statRow(key, cfg, d.radiant?.stats?.[key], d.dire?.stats?.[key]);
+    }).join('');
+    const expanded = gi < 2 ? 'show' : '';
     return `
-    <div style="display:flex;align-items:center;gap:.55rem;padding:.4rem 0;border-bottom:1px solid var(--dota-border)">
-      ${h.icono
-        ? `<img src="${h.icono}" class="hero-detail-img" alt="${h.nombre}"
-                onerror="this.replaceWith(heroFallback(44))">`
-        : `<div class="hero-detail-fallback"><i class="bi bi-shield-fill"></i></div>`}
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.8rem;font-weight:600;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.nombre}</div>
-        <div style="display:flex;align-items:center;gap:.35rem;margin-top:3px">
-          <div style="flex:1;height:4px;background:var(--dota-border);border-radius:2px;overflow:hidden">
-            <div style="width:${prPct}%;height:100%;background:${color};opacity:.75;border-radius:2px"></div>
-          </div>
-          <span style="font-size:.63rem;color:var(--dota-muted);white-space:nowrap;flex-shrink:0"
-                title="Pick rate: este héroe fue elegido en el ${prPct}% de las partidas del equipo (${pr.toFixed(3)} en escala 0-1). En Dota 2 hay 5 héroes por partida, pero en el historial del equipo se usan muchos más — aquí ves qué tan frecuente fue cada uno.">${prPct}% picks</span>
-        </div>
-      </div>
-    </div>`;
+      <div class="stat-group">
+        <button class="stat-group-header" onclick="toggleGroup(this)" aria-expanded="${gi < 2}">
+          <i class="bi ${g.icono}"></i>
+          ${g.nombre}
+          <i class="bi bi-chevron-down ms-auto stat-group-arrow"></i>
+        </button>
+        <div class="stat-group-body ${expanded}">${filas}</div>
+      </div>`;
   }).join('');
-  };
-
-  // ── Aviso si la fila es incompleta (sin historial de equipo) ───────────────
-  const avisoIncompleto = !d.datos_completos
-    ? `<div style="background:rgba(200,151,58,.12);border:1px solid rgba(200,151,58,.35);border-radius:6px;padding:.7rem 1rem;margin-bottom:.75rem;font-size:.8rem;color:var(--dota-gold)">
-        <i class="bi bi-exclamation-triangle me-1"></i>
-        <strong>Datos incompletos</strong> — Esta partida no tiene historial de equipo registrado.
-        Solo existe el resultado (quién ganó). El ~6% del dataset tiene este problema:
-        los equipos no tenían partidas previas en la ventana de análisis cuando se construyó el dataset.
-      </div>`
-    : '';
 
   const ventanaInfo = (v, color) => v
-    ? `<span style="font-size:.65rem;color:${color};opacity:.7" title="El equipo tiene estadísticas promediadas sobre ${v} partidas previas a este match. Más partidas = más héroes distintos con valores > 0.">${v} partidas en ventana</span>`
+    ? `<span class="ventana-badge" style="color:${color}">${v} partidas en ventana</span>`
     : '';
 
   cont.innerHTML = `
-    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
-      <span style="font-size:1.2rem;font-weight:800;color:var(--dota-gold)">Match #${d.match_id}</span>
-      <span style="color:var(--dota-muted);font-size:.85rem">${d.dt_match?.slice(0, 10) ?? ''}</span>
+    <div class="detalle-header">
+      <span class="detalle-match-id">Match #${d.match_id}</span>
+      <span class="detalle-date">${d.dt_match?.slice(0, 10) ?? ''}</span>
       ${badgeGanador(d.ganador)}
       <button class="btn-dota-outline ms-auto" onclick="lanzarKNNDesdeDetalle(${d.match_id})">
-        <i class="bi bi-diagram-3"></i> Ver partidas similares (KNN)
+        <i class="bi bi-diagram-3"></i> Partidas similares
       </button>
     </div>
 
-    <div class="row g-3">
+    <div class="key-stats-strip">${keyStatsHtml}</div>
+
+    <div class="row g-3 mt-0">
       <div class="col-12 col-lg-7">
         <div class="card-dota">
-          <div class="card-header-dota d-flex justify-content-between align-items-center">
+          <div class="card-header-dota" style="display:flex;justify-content:space-between">
             <span style="color:var(--dota-radiant)">● Radiant</span>
-            <span>Estadísticas por equipo</span>
-            <span style="color:var(--dota-dire)">● Dire</span>
+            <span style="color:var(--dota-muted);font-size:.75rem">Estadísticas históricas del equipo</span>
+            <span style="color:var(--dota-dire)">Dire ●</span>
           </div>
-          <div style="padding:.75rem 1rem;max-height:530px;overflow-y:auto">
-            ${filaStats}
-          </div>
+          <div style="padding:.5rem .75rem">${gruposHtml}</div>
         </div>
       </div>
-
       <div class="col-12 col-lg-5">
         <div class="row g-3">
           <div class="col-6">
-            <div class="card-dota">
+            <div class="card-dota h-100">
               <div class="card-header-dota" style="color:var(--dota-radiant);display:flex;justify-content:space-between;align-items:center">
-                <span>Radiant — Héroes</span>
+                <span><i class="bi bi-person-fill me-1"></i>Radiant</span>
                 ${ventanaInfo(d.radiant?.ventana, 'var(--dota-radiant)')}
               </div>
-              <div style="padding:.5rem .75rem;max-height:420px;overflow-y:auto">
+              <div style="padding:.5rem .75rem">
                 ${heroesHtml(d.radiant?.heroes ?? [], 'var(--dota-radiant)')}
               </div>
             </div>
           </div>
           <div class="col-6">
-            <div class="card-dota">
+            <div class="card-dota h-100">
               <div class="card-header-dota" style="color:var(--dota-dire);display:flex;justify-content:space-between;align-items:center">
-                <span>Dire — Héroes</span>
+                <span><i class="bi bi-person-fill me-1"></i>Dire</span>
                 ${ventanaInfo(d.dire?.ventana, 'var(--dota-dire)')}
               </div>
-              <div style="padding:.5rem .75rem;max-height:420px;overflow-y:auto">
+              <div style="padding:.5rem .75rem">
                 ${heroesHtml(d.dire?.heroes ?? [], 'var(--dota-dire)')}
               </div>
             </div>
@@ -457,6 +495,12 @@ async function cargarDetalle(matchId) {
         </div>
       </div>
     </div>`;
+}
+
+function toggleGroup(btn) {
+  const body = btn.nextElementSibling;
+  const open = body.classList.toggle('show');
+  btn.setAttribute('aria-expanded', open);
 }
 
 function lanzarKNNDesdeDetalle(matchId) {
@@ -469,6 +513,20 @@ function lanzarKNNDesdeDetalle(matchId) {
 }
 
 // ─── TAB 4: KNN — Partidas Similares ─────────────────────────────────────────
+
+// Renderiza lista de héroes pequeños para tarjetas KNN
+function heroesKnnHtml(heroes, color) {
+  if (!heroes || heroes.length === 0) return '<span style="font-size:.68rem;color:var(--dota-muted)">Sin datos</span>';
+  return `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">` +
+    heroes.map(h => h.icono
+      ? `<img src="${h.icono}" loading="lazy" decoding="async"
+              title="${escAttr(h.nombre)} (${Math.round(h.frecuencia*100)}% picks)"
+              style="width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:center 15%;border:1px solid ${color};background:var(--dota-surface)"
+              onerror="this.style.display='none'">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--dota-surface);border:1px solid var(--dota-border);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--dota-muted)"><i class="bi bi-shield-fill"></i></div>`
+    ).join('') + `</div>`;
+}
+
 async function ejecutarKNN() {
   const matchId = document.getElementById('inputMatchKnn').value.trim();
   const k       = parseInt(document.getElementById('inputK').value);
@@ -537,6 +595,20 @@ async function ejecutarKNN() {
         <div class="compare-bar mt-2" title="Similaridad relativa — barra más larga = más parecida">
           <div class="compare-fill" style="width:${similPct}%;background:var(--dota-gold)"></div>
         </div>
+        <div style="display:flex;gap:1.2rem;margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--dota-border)">
+          <div style="flex:1">
+            <div style="font-size:.65rem;color:var(--dota-radiant);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">
+              <i class="bi bi-person-fill"></i> Radiant — Top ${(s.heroes_r||[]).length} héroes
+            </div>
+            ${heroesKnnHtml(s.heroes_r, 'var(--dota-radiant)')}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.65rem;color:var(--dota-dire);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">
+              <i class="bi bi-person-fill"></i> Dire — Top ${(s.heroes_d||[]).length} héroes
+            </div>
+            ${heroesKnnHtml(s.heroes_d, 'var(--dota-dire)')}
+          </div>
+        </div>
       </div>`;
   }).join('');
 
@@ -544,6 +616,218 @@ async function ejecutarKNN() {
     `<div style="font-size:.8rem;color:var(--dota-muted);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em">
       <i class="bi bi-diagram-3"></i> ${d.k} partidas más similares · algoritmo KNN euclidiano con normalización StandardScaler
     </div>` + similHtml;
+}
+
+// ─── TAB 5: Gráficos ─────────────────────────────────────────────────────────
+async function cargarGraficos() {
+  graficosInit = true;
+  const r = await fetch('/api/graficos');
+  if (!r.ok) return;
+  const d = await r.json();
+  // Ordenar por winrate desc para que las barras fluyan de mayor a menor (no "chueco")
+  const topHeroes = [...d.top50_heroes].sort((a, b) => b.winrate - a.winrate);
+  const gpmXpm   = d.gpm_xpm;
+  const winRates = d.win_rates;
+  const anomaly  = d.anomaly;
+
+  const gridColor  = 'rgba(255,255,255,0.06)';
+  const fontColor  = '#6a7a90';
+  const chartDefaults = {
+    color: fontColor,
+    font: { family: "'Segoe UI', system-ui, sans-serif", size: 11 },
+  };
+  Chart.defaults.color       = chartDefaults.color;
+  Chart.defaults.font.family = chartDefaults.font.family;
+  Chart.defaults.font.size   = chartDefaults.font.size;
+
+  // ── GRÁFICO 1: Win Rate de Top 50 Héroes ──────────────────────────────────
+  const ctx1   = document.getElementById('chartHeroes').getContext('2d');
+  const labels = topHeroes.map(h => h.nombre);
+  const values = topHeroes.map(h => h.winrate);
+  const colors = values.map(v =>
+    v >= 55 ? 'rgba(92,191,138,0.82)' :
+    v <= 45 ? 'rgba(191,92,92,0.82)' :
+              'rgba(200,151,58,0.82)'
+  );
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Win Rate (%)',
+        data: values,
+        backgroundColor: colors,
+        borderColor: colors.map(c => c.replace('0.82', '1')),
+        borderWidth: 1,
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const h = topHeroes[ctx.dataIndex];
+              return [
+                ` Win Rate: ${ctx.parsed.y}%`,
+                ` Partidas: ${h.partidas.toLocaleString()}`,
+                ` Pick freq: ${h.freq.toFixed(1)}`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { maxRotation: 55, minRotation: 45, font: { size: 9 } },
+          grid: { color: gridColor },
+        },
+        y: {
+          min: 40,
+          max: 65,
+          ticks: { callback: v => v + '%' },
+          grid: { color: gridColor },
+        },
+      },
+    },
+  });
+
+  // ── GRÁFICO 2: GPM y XPM ─────────────────────────────────────────────────
+  const ctx2 = document.getElementById('chartGpmXpm').getContext('2d');
+  new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: ['Radiant', 'Dire'],
+      datasets: [
+        {
+          label: 'GPM (Oro/min)',
+          data: [gpmXpm.radiant_gpm, gpmXpm.dire_gpm],
+          backgroundColor: ['rgba(92,191,138,0.75)', 'rgba(191,92,92,0.75)'],
+          borderColor:     ['rgba(92,191,138,1)',     'rgba(191,92,92,1)'],
+          borderWidth: 1, borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'XPM (Exp/min)',
+          data: [gpmXpm.radiant_xpm, gpmXpm.dire_xpm],
+          backgroundColor: ['rgba(92,191,138,0.35)', 'rgba(191,92,92,0.35)'],
+          borderColor:     ['rgba(92,191,138,.7)',    'rgba(191,92,92,.7)'],
+          borderWidth: 1, borderRadius: 4, yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { grid: { color: gridColor }, ticks: { callback: v => v.toLocaleString() } },
+        x: { grid: { color: gridColor } },
+      },
+    },
+  });
+
+  // ── GRÁFICO 3: Winrate Donut ───────────────────────────────────────────────
+  const ctx3 = document.getElementById('chartWinrate').getContext('2d');
+  new Chart(ctx3, {
+    type: 'doughnut',
+    data: {
+      labels: [`Radiant ${winRates.radiant_pct}%`, `Dire ${winRates.dire_pct}%`],
+      datasets: [{
+        data: [winRates.radiant_wins, winRates.dire_wins],
+        backgroundColor: ['rgba(92,191,138,0.80)', 'rgba(191,92,92,0.80)'],
+        borderColor:     ['rgba(92,191,138,1)',     'rgba(191,92,92,1)'],
+        borderWidth: 2,
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} partidas`,
+          },
+        },
+      },
+    },
+  });
+
+  // ── GRÁFICO 4: Anomalías por año ──────────────────────────────────────────
+  // Stats summary de anomalías
+  const anomBox = document.getElementById('anomalyStats');
+  anomBox.innerHTML = `
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.82rem">
+      <div style="background:rgba(191,92,92,.1);border:1px solid rgba(191,92,92,.3);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Total partidas</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-gold)">${anomaly.total.toLocaleString()}</div>
+      </div>
+      <div style="background:rgba(92,191,138,.1);border:1px solid rgba(92,191,138,.3);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Partidas válidas</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-radiant)">${anomaly.valid.toLocaleString()}</div>
+      </div>
+      <div style="background:rgba(191,92,92,.1);border:1px solid rgba(191,92,92,.3);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Sin héroes (ambos equipos)</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-dire)">${anomaly.no_heroes_both.toLocaleString()}</div>
+      </div>
+      <div style="background:rgba(200,151,58,.1);border:1px solid rgba(200,151,58,.3);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Sin héroes solo Radiant</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-gold)">${anomaly.no_heroes_r.toLocaleString()}</div>
+      </div>
+      <div style="background:rgba(200,151,58,.1);border:1px solid rgba(200,151,58,.3);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Sin héroes solo Dire</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-gold)">${anomaly.no_heroes_d.toLocaleString()}</div>
+      </div>
+      <div style="background:rgba(191,92,92,.15);border:1px solid rgba(191,92,92,.4);border-radius:6px;padding:.6rem 1rem">
+        <div style="color:var(--dota-muted);font-size:.7rem">Total anomalías (excluidas)</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--dota-dire)">${anomaly.total_invalid.toLocaleString()} <span style="font-size:.75rem;font-weight:400">(${((anomaly.total_invalid/anomaly.total)*100).toFixed(1)}%)</span></div>
+      </div>
+    </div>
+    <p style="margin:.8rem 0 0;font-size:.75rem;color:var(--dota-muted)">
+      <i class="bi bi-info-circle"></i>
+      Estas partidas tienen <code>match_id</code>, fecha y resultado pero <strong>cero columnas de héroes con valor &gt; 0</strong>.
+      Son equipos sin historial previo en la ventana de análisis (debut en torneo, datos faltantes en OpenDota API).
+      <strong>Se excluyen automáticamente</strong> del listado de partidas.
+    </p>`;
+
+  const ctx4   = document.getElementById('chartAnomaly').getContext('2d');
+  const byYear = anomaly.by_year || [];
+  new Chart(ctx4, {
+    type: 'bar',
+    data: {
+      labels: byYear.map(y => String(y._year)),
+      datasets: [
+        {
+          label: 'Partidas válidas',
+          data: byYear.map(y => y.valid),
+          backgroundColor: 'rgba(92,191,138,0.70)',
+          borderColor: 'rgba(92,191,138,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+        {
+          label: 'Sin héroes (anomalía)',
+          data: byYear.map(y => y.invalid),
+          backgroundColor: 'rgba(191,92,92,0.80)',
+          borderColor: 'rgba(191,92,92,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        x: { stacked: true, grid: { color: gridColor } },
+        y: { stacked: true, grid: { color: gridColor }, ticks: { callback: v => v.toLocaleString() } },
+      },
+    },
+  });
 }
 
 // ─── Inicio de la aplicación ─────────────────────────────────────────────────

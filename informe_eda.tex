@@ -1,0 +1,999 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm,headheight=15pt]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{xcolor}
+\definecolor{darkblue}{RGB}{0,0,139}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Dota 2 Pro Matches --- An\'alisis Exploratorio de Datos}}
+\fancyhead[R]{\small T\'opicos en Ciencias de Datos}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{}{0em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\setlist[itemize]{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{graphicx}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{parskip}
+\setlength{\parskip}{6pt}
+\usepackage{mdframed}
+\usepackage{tocloft}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=darkblue,urlcolor=darkblue,citecolor=darkblue}
+\renewcommand{\cfttoctitlefont}{\large\bfseries}
+\setlength{\cftbeforesecskip}{4pt}
+
+% Caja para placeholders de imágenes
+% Para reemplazar por la imagen real, sustituir el bloque \imagenplaceholder{...}{...}
+% por: \includegraphics[width=0.95\linewidth]{graficoN.png}
+\newcommand{\imagenplaceholder}[2]{%
+  \begin{center}
+    \fbox{%
+      \begin{minipage}{0.85\linewidth}
+        \centering
+        \vspace{1.5cm}
+        {\large\bfseries #1}\\[0.4em]
+        {\small\itshape #2}
+        \vspace{1.5cm}
+      \end{minipage}%
+    }
+  \end{center}
+}
+
+\begin{document}
+
+%% PORTADA
+\begin{titlepage}
+  \thispagestyle{empty}
+  \begin{flushleft}
+    Universidad La Salle\\
+    Facultad de Ingenier\'ia de Producci\'on y Servicios\\
+    Escuela Profesional de Ciencia de la Computaci\'on
+  \end{flushleft}
+  \vspace*{\fill}
+  \begin{center}
+    {\Large\bfseries INFORME FINAL DE AN\'ALISIS EXPLORATORIO DE DATOS}\\[1.2em]
+    {\Large Dota 2 Pro Matches}\\[1.5em]
+    {\normalsize Inteligencia de Negocios y Miner\'ia de Datos}
+  \end{center}
+  \vspace*{\fill}
+  \begin{flushright}
+    \begin{tabular}{ll}
+      Integrante: & Piero Adrian Delgado Chipana \\[0.4em]
+      Profesor:   & Ana Maria Cuadros Valdivia   \\[0.4em]
+      \multicolumn{2}{l}{Arequipa --- Per\'u}
+    \end{tabular}
+  \end{flushright}
+\end{titlepage}
+
+%% INDICE
+\thispagestyle{fancy}
+\renewcommand{\contentsname}{\'Indice de Contenidos}
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{Definici\'on del Problema}
+%% ============================================================
+
+Dota~2 es un videojuego de estrategia en l\'inea (MOBA) de \textbf{5 jugadores
+contra 5}, donde cada jugador controla un \textbf{h\'eroe} con habilidades
+\'unicas. Un equipo se denomina \textbf{Radiant} y el otro \textbf{Dire}; la
+partida termina cuando un equipo destruye el \textit{Ancient} rival.
+
+Entre 2019 y mediados de 2021, Dota~2 atraves\'o su \textbf{periodo de mayor
+auge profesional}: el juego cont\'o con el mayor n\'umero de equipos activos,
+torneos internacionales y audiencia en toda su historia. En esos a\~nos el
+juego ten\'ia una versi\'on del mapa, un pool de h\'eroes y un sistema de \'items
+cuyo meta competitivo fue ampliamente estudiado. Desde entonces, Dota~2 recibi\'o
+cambios radicales en el dise\~no del mapa, nuevos h\'eroes y reworks completos de
+mec\'anicas, por lo que la data de ese periodo ya no refleja c\'omo se juega hoy.
+
+La \textbf{problem\'atica principal} es que los jugadores y analistas que hoy
+buscan referencias del juego profesional de esa \'epoca ---para estudiar estrategias,
+entender el meta o prepararse para competir--- no disponen de una herramienta
+que les permita explorar esas partidas de forma estructurada. El dataset contiene
+\textbf{47\,150 partidas profesionales (2019--2021)}, pero cada fila \textbf{no}
+registra los eventos en tiempo real: almacena el \textbf{perfil hist\'orico
+promediado} de cada equipo en sus $N$ partidas previas (ventana hist\'orica),
+lo que permite analizar el rendimiento acumulado y comparar equipos de forma
+objetiva antes de que la partida comience.
+
+%% ============================================================
+\section{Objetivos}
+%% ============================================================
+
+\begin{itemize}
+  \item \textbf{Predictivo:} demostrar que el equipo Radiant presenta ventajas
+        estructurales sobre Dire incluso antes de que la partida comience,
+        cuantificables a trav\'es del rendimiento hist\'orico acumulado de cada
+        equipo (GPM, XPM, KDA, win rate, etc.) y verificables con la variable
+        objetivo \texttt{radiant\_win}.
+  \item \textbf{Exploratorio y manejo de errores:} identificar y gestionar
+        las inconsistencias del dataset: partidas no completadas por abandono,
+        partidas de torneo jugadas simult\'aneamente con distinto \texttt{match\_id}
+        pero mismo resultado y rendimiento (y m\'as h\'eroes registrados), y
+        partidas sin h\'eroes o con h\'eroes incompletos que deben excluirse del
+        an\'alisis t\'actico pero no del an\'alisis de rendimiento general.
+\end{itemize}
+
+%% ============================================================
+\section{Hip\'otesis Iniciales}
+%% ============================================================
+
+\subsection{Motivaci\'on}
+
+Las hip\'otesis surgieron a partir de la observaci\'on de que los equipos
+profesionales desarrollan ventajas medibles en distintas dimensiones del juego:
+eficiencia econ\'omica, rendimiento de combate, control de visi\'on y objetivos
+neutrales. Al explorar las 66 columnas de estad\'isticas del dataset se
+identificaron variables con potencial predictivo directo sobre el resultado de la
+partida (\texttt{radiant\_win}). Adicionalmente, el sesgo estructural de mapa de
+Radiant (52.1\,\% de victorias) y la ley de los grandes n\'umeros sobre ventanas
+hist\'oricas grandes motivaron formular hip\'otesis verificables.
+
+\subsection{Hip\'otesis en Forma de Pregunta}
+
+\textbf{Hip\'otesis 1:}\\
+\textit{¿Los equipos con mayor \texttt{gold\_per\_min\_avg} y \texttt{xp\_per\_min\_avg}
+tienen mayor probabilidad de ganar, siendo la eficiencia econ\'omica el principal
+predictor de victoria en Dota~2 profesional?}
+
+\textbf{Hip\'otesis 2:}\\
+\textit{¿Los equipos con mejor KDA hist\'orico (\texttt{kda\_avg} $>$ 3.5) tienen una
+tasa de victoria (\texttt{win\_pct}) significativamente mayor que equipos con
+KDA $<$ 2.0?}
+
+\textbf{Hip\'otesis 3:}\\
+\textit{¿El control de visi\'on --- medido por la cantidad de wards colocadas y
+destruidas --- diferencia estad\'isticamente a los equipos ganadores de los perdedores?}
+
+\textbf{Hip\'otesis 4:}\\
+\textit{¿Matar a Roshan (\texttt{roshan\_kills\_avg} alto) est\'a asociado a una
+mayor probabilidad de ganar, especialmente en partidas disputadas de larga duraci\'on?}
+
+\textbf{Hip\'otesis 5:}\\
+\textit{¿El control de torres (\texttt{tower\_kills\_avg}) es m\'as predictivo del
+resultado que el control de kills de h\'eroes (\texttt{hero\_kills\_avg})?}
+
+\subsection{Plan de An\'alisis}
+
+Para investigar cada hip\'otesis se sigui\'o el siguiente proceso:
+
+\begin{enumerate}
+  \item \textbf{Carga y limpieza:} lectura del CSV, detecci\'on de partidas sin
+        historial ($\sim$6\,\%), imputaci\'on con la media columnar.
+  \item \textbf{An\'alisis descriptivo:} c\'alculo de medidas de tendencia central
+        y dispersi\'on para las 66 features principales.
+  \item \textbf{Distribuci\'on de resultados:} conteo de victorias Radiant vs.\ Dire
+        por a\~no y global.
+  \item \textbf{An\'alisis de correlaci\'on:} relaci\'on entre GPM/XPM y
+        \texttt{win\_pct}; scatter plots KDA vs.\ win rate por cuartiles.
+  \item \textbf{An\'alisis de objetivos:} comparaci\'on de promedios de
+        \texttt{roshan\_kills\_avg} y \texttt{tower\_kills\_avg} entre victorias y
+        derrotas.
+  \item \textbf{An\'alisis de visi\'on:} comparaci\'on de \texttt{observer\_uses\_avg}
+        y \texttt{observer\_kills\_avg} entre equipos ganadores y perdedores.
+  \item \textbf{Visualizaci\'on:} once gr\'aficos exploratorios que cubren anomal\'ias,
+        eficiencia econ\'omica, win rates, KDA, visi\'on, objetivos, duraci\'on,
+        evoluci\'on temporal y correlaciones.
+\end{enumerate}
+
+%% ============================================================
+\section{Fuente de Datos}
+%% ============================================================
+
+\subsection{Fuente}
+
+El conjunto de datos fue publicado en \textbf{Kaggle} por el usuario Teo Calvo
+bajo el nombre \textit{Dota 2 Pro Players Matches 2019--2021}~\cite{kaggle2021}.
+Los datos fueron extra\'idos de la \textbf{API p\'ublica de OpenDota}, que agrega
+estad\'isticas de Dota~2 directamente desde los servidores de Valve. La
+recolecci\'on abarca el periodo \textbf{2019-01-01 -- 2021-06-18} e incluye
+exclusivamente torneos y ligas profesionales. El procesamiento y estructuraci\'on
+del dataset siguieron la metodolog\'ia descrita en el paper de referencia
+\cite{paper2021}, que propone un marco para el an\'alisis de rendimiento de equipos
+profesionales de Dota~2 a partir de ventanas hist\'oricas de estad\'isticas.
+
+El conocimiento involucrado proviene del \'area de \textit{deportes electr\'onicos
+(esports)} y miner\'ia de datos aplicada a videojuegos competitivos. El problema
+computacional central es doble: \textbf{clasificaci\'on binaria} (\textbf{¿tiene
+Radiant ventaja antes de jugar?}) y \textbf{recuperaci\'on de informaci\'on}
+(b\'usqueda de partidas similares por KNN). Cada variable fue capturada porque
+representa una dimensi\'on real de rendimiento hist\'orico --- econ\'omica, de
+combate, de objetivos o de visi\'on --- con impacto demostrado en el resultado
+final de las partidas.
+
+\subsection{Descripci\'on}
+
+\subsubsection*{a) A nivel de atributos}
+
+\textbf{Archivo:} \texttt{tb\_pro\_players\_matches.csv} \\
+\textbf{Tama\~no:} $\sim$50~MB \quad \textbf{Filas:} 47\,150 \quad
+\textbf{Columnas:} 317 \quad \textbf{Periodo:} 2019-01-01 -- 2021-06-18
+
+Las 317 columnas se organizan en tres grupos funcionales:
+
+\begin{center}
+\begin{tabular}{lrp{7cm}}
+  \toprule
+  \textbf{Grupo} & \textbf{N.º columnas} & \textbf{Descripci\'on} \\
+  \midrule
+  Identificadores          & 3   & \texttt{match\_id}, \texttt{dt\_match}, \texttt{radiant\_win} \\
+  Estad\'isticas hist\'oricas & 72  & 36 m\'etricas $\times$ 2 equipos (\texttt{\_r} / \texttt{\_d}) \\
+  Pick rate de h\'eroes    & 242 & 121 h\'eroes $\times$ 2 equipos (\texttt{\_r} / \texttt{\_d}) \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Tipos de datos:}
+\begin{itemize}
+  \item \textbf{Entero} (\texttt{int64}): \texttt{match\_id} --- ID \'unico de la
+        partida en servidores Valve.
+  \item \textbf{Objeto} (\texttt{object}): \texttt{dt\_match} --- fecha y hora exacta
+        (UTC).
+  \item \textbf{Booleano}: \texttt{radiant\_win} --- \texttt{True} = gan\'o Radiant,
+        \texttt{False} = gan\'o Dire.
+  \item \textbf{Flotante} (\texttt{float64}): todas las m\'etricas hist\'oricas
+        (promedios sobre la ventana) y los pick rates de h\'eroes.
+\end{itemize}
+
+\textbf{Cuadro resumen de atributos principales:}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{p{4.2cm}p{3.8cm}p{1.4cm}p{1.2cm}p{2.5cm}}
+  \toprule
+  \textbf{Atributo} & \textbf{Descripci\'on} & \textbf{Tipo} & \textbf{Nulos} & \textbf{Rango t\'ipico} \\
+  \midrule
+  \endhead
+  \texttt{match\_id}
+    & ID \'unico de la partida (Valve)
+    & int64 & 0 & --- \\
+  \texttt{dt\_match}
+    & Fecha/hora exacta (UTC)
+    & object & 0 & 2019--2021 \\
+  \texttt{radiant\_win}
+    & Resultado (True/False)
+    & bool & 0 & \{T, F\} \\
+  \texttt{freq\_r/d}
+    & N.º partidas en la ventana hist\'orica
+    & float64 & $\sim$6\,\% & 1 -- 323 \\
+  \texttt{recencia\_r/d}
+    & D\'ias desde \'ultima partida del equipo
+    & float64 & $\sim$6\,\% & 0 -- 184 \\
+  \texttt{win\_pct\_r/d}
+    & Tasa de victorias hist\'oricas (0--1)
+    & float64 & $\sim$6\,\% & 0.35 -- 0.75 \\
+  \texttt{kda\_avg\_r/d}
+    & Ratio (Kills + Asist) / Muertes
+    & float64 & $\sim$6\,\% & 1.5 -- 6.0 \\
+  \texttt{gold\_per\_min\_avg\_r/d}
+    & Oro por minuto (GPM)
+    & float64 & $\sim$6\,\% & 350 -- 600 \\
+  \texttt{xp\_per\_min\_avg\_r/d}
+    & Experiencia por minuto (XPM)
+    & float64 & $\sim$6\,\% & 350 -- 700 \\
+  \texttt{hero\_damage\_avg\_r/d}
+    & Da\~no total a h\'eroes enemigos
+    & float64 & $\sim$6\,\% & 8\,000 -- 30\,000 \\
+  \texttt{tower\_kills\_avg\_r/d}
+    & Torres enemigas destruidas (prom.)
+    & float64 & $\sim$6\,\% & 2 -- 8 \\
+  \texttt{tower\_damage\_avg\_r/d}
+    & Da\~no infligido a torres
+    & float64 & $\sim$6\,\% & 5\,000 -- 25\,000 \\
+  \texttt{roshan\_kills\_avg\_r/d}
+    & Kills de Roshan por partida
+    & float64 & $\sim$6\,\% & 0.0 -- 1.5 \\
+  \texttt{hero\_kills\_avg\_r/d}
+    & H\'eroes enemigos eliminados
+    & float64 & $\sim$6\,\% & 10 -- 35 \\
+  \texttt{deaths\_avg\_r/d}
+    & Muertes propias del equipo
+    & float64 & $\sim$6\,\% & 8 -- 30 \\
+  \texttt{assists\_avg\_r/d}
+    & Asistencias en kills
+    & float64 & $\sim$6\,\% & 20 -- 60 \\
+  \texttt{kills\_per\_min\_avg\_r/d}
+    & Ritmo de generaci\'on de kills
+    & float64 & $\sim$6\,\% & 0.3 -- 0.8 \\
+  \texttt{last\_hits\_avg\_r/d}
+    & Last hits (farm de carril)
+    & float64 & $\sim$6\,\% & 300 -- 900 \\
+  \texttt{denies\_avg\_r/d}
+    & Denies (mec\'anica exclusiva de Dota~2)
+    & float64 & $\sim$6\,\% & 30 -- 120 \\
+  \texttt{lane\_kills\_avg\_r/d}
+    & Kills en fase de carril ($\sim$10 min)
+    & float64 & $\sim$6\,\% & 2 -- 10 \\
+  \texttt{firstblood\_claimed\_avg\_r/d}
+    & Proporci\'on de partidas con First Blood
+    & float64 & $\sim$6\,\% & 0.35 -- 0.65 \\
+  \texttt{observer\_uses\_avg\_r/d}
+    & Wards observer propias colocadas
+    & float64 & $\sim$6\,\% & 5 -- 20 \\
+  \texttt{observer\_kills\_avg\_r/d}
+    & Wards observer enemigas destruidas
+    & float64 & $\sim$6\,\% & 3 -- 15 \\
+  \texttt{sentry\_uses\_avg\_r/d}
+    & Wards sentry propias colocadas
+    & float64 & $\sim$6\,\% & 4 -- 20 \\
+  \texttt{sentry\_kills\_avg\_r/d}
+    & Wards sentry enemigas destruidas
+    & float64 & $\sim$6\,\% & 3 -- 15 \\
+  \texttt{buyback\_count\_avg\_r/d}
+    & Compras de revivir por partida
+    & float64 & $\sim$6\,\% & 0.3 -- 2.0 \\
+  \texttt{level\_avg\_r/d}
+    & Nivel promedio del equipo al final
+    & float64 & $\sim$6\,\% & 18 -- 28 \\
+  \texttt{actions\_per\_min\_avg\_r/d}
+    & Acciones por minuto (APM)
+    & float64 & $\sim$6\,\% & 150 -- 350 \\
+  \texttt{neutral\_kills\_avg\_r/d}
+    & Kills de neutrales en jungla
+    & float64 & $\sim$6\,\% & 50 -- 300 \\
+  \texttt{duration\_avg\_win\_r/d}
+    & Duraci\'on promedio en victorias (min)
+    & float64 & $\sim$6\,\% & 30 -- 50 \\
+  \texttt{duration\_avg\_lose\_r/d}
+    & Duraci\'on promedio en derrotas (min)
+    & float64 & $\sim$6\,\% & 32 -- 55 \\
+  \texttt{hero\_<ID>\_avg\_r/d}
+    & Pick rate del h\'eroe (proporci\'on)
+    & float64 & $\sim$6\,\% & 0.0 -- 1.0 \\
+  \bottomrule
+\end{longtable}
+\end{center}
+
+\noindent\textbf{Clasificaci\'on de variables:}
+\begin{itemize}
+  \item \texttt{radiant\_win}: \textbf{categ\'orica nominal binaria} (variable
+        objetivo).
+  \item M\'etricas de rendimiento (\texttt{kda\_avg}, \texttt{gold\_per\_min\_avg},
+        etc.): \textbf{cuantitativas continuas}.
+  \item \texttt{hero\_<ID>\_avg}: \textbf{cuantitativa continua}, interpretable
+        como proporci\'on (rango $[0,1]$).
+  \item \texttt{freq\_r/d}, \texttt{recencia\_r/d}: \textbf{cuantitativas
+        discretas}, usadas como metadatos de confiabilidad.
+\end{itemize}
+
+\noindent\textbf{Valores nulos:} el $\sim$\textbf{6\,\%} del dataset (2\,819
+partidas) presenta \texttt{NaN} en todas las columnas de estad\'isticas.
+Corresponden a partidas no completadas por abandono de jugadores, partidas de
+torneo jugadas simult\'aneamente que comparten resultado y rendimiento, o equipos
+sin historial en la API. Se gestionan mediante imputaci\'on con la media columnar.
+
+\noindent\textbf{Medidas de dispersi\'on --- ventana hist\'orica:}
+
+\begin{center}
+\begin{tabular}{lrrrr}
+  \toprule
+  \textbf{Variable} & \textbf{Media} & \textbf{Mediana} & \textbf{M\'ax.} & \textbf{Desv. Est.} \\
+  \midrule
+  \texttt{freq\_r} (partidas)   & 74.9 & 63 & 323 & $\sim$52 \\
+  \texttt{freq\_d} (partidas)   & 74.7 & 62 & 323 & $\sim$52 \\
+  \texttt{recencia\_r} (d\'ias) &  5.2 &  2 & 184 & $\sim$12 \\
+  \texttt{recencia\_d} (d\'ias) &  5.1 &  2 & 184 & $\sim$12 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{b) A nivel de registros}
+
+Cada registro representa \textbf{una partida profesional de Dota~2} identificada por
+un \texttt{match\_id} \'unico --- sin duplicados. Los registros est\'an
+\textbf{etiquetados} mediante \texttt{radiant\_win}: \texttt{True} indica victoria
+de Radiant y \texttt{False} victoria de Dire.
+
+No hay granularidad geogr\'afica. La granularidad temporal es \textbf{a nivel de
+partida individual} con fecha y hora exacta en UTC. La distribuci\'on temporal es:
+
+\begin{center}
+\begin{tabular}{lrr}
+  \toprule
+  \textbf{A\~no} & \textbf{Partidas} & \textbf{\% del total} \\
+  \midrule
+  2019              & 17\,578 & 37.3\,\% \\
+  2020              & 22\,376 & 47.4\,\% \\
+  2021 (hasta jun.) &  7\,196 & 15.3\,\% \\
+  \midrule
+  \textbf{Total}   & \textbf{47\,150} & \textbf{100\,\%} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+Resultados globales: \textbf{Radiant gana 52.1\,\%} y Dire gana 47.9\,\%.
+Esta diferencia es un fen\'omeno conocido en Dota~2 relacionado con la geometr\'ia
+del mapa y la posici\'on de los objetivos secundarios.
+
+\subsubsection*{c) Relaci\'on entre atributos}
+
+Existe una relaci\'on directa entre \texttt{win\_pct\_r/d} y las m\'etricas de
+rendimiento: los equipos con mayor tasa de victorias hist\'orica tienden a registrar
+KDA, GPM y XPM m\'as elevados, dado que las partidas ganadas acumulan m\'as kills,
+asistencias y eficiencia econ\'omica. La relaci\'on \texttt{tower\_kills\_avg} --
+\texttt{win\_pct} es especialmente relevante porque destruir torres es el objetivo
+primario del juego. Las variables \texttt{freq\_r/d} y \texttt{recencia\_r/d} son
+metadatos de confiabilidad y no miden rendimiento directamente.
+
+\textbf{Terminolog\'ia especial del dataset:}
+\begin{itemize}
+  \item \textbf{GPM} (\textit{Gold Per Minute}): ritmo de generaci\'on de oro;
+        indicador primario de eficiencia econ\'omica.
+  \item \textbf{XPM} (\textit{Experience Per Minute}): ritmo de ganancia de
+        experiencia; determina el nivel del h\'eroe.
+  \item \textbf{KDA}: ratio (Kills + Asistencias) / Muertes de equipo.
+        KDA $>$ 4 es excelente; KDA $<$ 1.5 suele correlacionar con derrotas.
+  \item \textbf{Roshan}: boss neutral de alto valor; matarlo otorga el Aegis
+        (vida extra) y gran recompensa de oro/XP.
+  \item \textbf{Ventana hist\'orica}: las $N$ partidas previas usadas para
+        calcular los promedios; \texttt{freq\_r/d} indica su tama\~no.
+  \item \textbf{Pick rate}: fracci\'on de partidas en que un h\'eroe fue elegido
+        dentro de la ventana hist\'orica.
+  \item \textbf{Last hits / Denies}: last hit = \'ultimo golpe a un creep para
+        obtener oro; deny = negar ese oro al enemigo (mec\'anica exclusiva de
+        Dota~2).
+  \item \textbf{TP Scroll}: pergamino de teletransporte a torre aliada; permite
+        rotaciones globales.
+  \item \textbf{First Blood}: primera kill de la partida; otorga $\sim$200 de
+        oro extra al equipo que la consigue.
+\end{itemize}
+
+\subsection{Formato}
+
+El dataset se encontr\'o en un \'unico archivo de texto plano con separaci\'on por
+comas (\textbf{CSV}): \texttt{tb\_pro\_players\_matches.csv} ($\sim$50~MB).
+Contiene 47\,150 filas y 317 columnas. Los tipos de datos originales son:
+entero (\texttt{match\_id}), booleano (\texttt{radiant\_win}), flotante (m\'etricas
+y pick rates) y texto (\texttt{dt\_match}).
+
+\subsection{Transformaciones}
+
+Las transformaciones aplicadas para convertir los datos en un formato utilizable
+para el modelo KNN fueron:
+
+\begin{table}[h!]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}c p{4.5cm} p{7cm}@{}}
+  \toprule
+  \textbf{Paso} & \textbf{T\'ecnica} & \textbf{Justificaci\'on} \\
+  \midrule
+  1 & C\'omputo de flags \texttt{\_has\_heroes}
+    & Detectar autom\'aticamente las 2\,819 filas sin historial de h\'eroes
+      (abandonos, partidas simult\'aneas o equipos sin registro) \\
+  2 & Selecci\'on de 66 columnas de estad\'isticas
+    & Se excluyen \texttt{recencia}, \texttt{freq}, \texttt{lane\_efficiency\_avg}
+      y los 242 pick rates: la alta dimensionalidad degrada la distancia euclidiana \\
+  3 & Imputaci\'on de NaN con la media columnar
+    & El $\sim$6\,\% de partidas sin historial no puede descartarse;
+      la media es la mejor estimaci\'on disponible \\
+  4 & Normalizaci\'on \textbf{StandardScaler} ($\mu=0,\,\sigma=1$)
+    & Las escalas son muy dispares: GPM $\approx$400 vs.\ Roshan kills $\approx$0.3 \\
+  5 & Construcci\'on de \'indice \textbf{BallTree}
+    & B\'usqueda eficiente de vecinos con m\'etrica euclidiana sobre 47\,150 registros \\
+  6 & Consulta KNN con el mismo scaler
+    & Garantiza comparabilidad entre el vector de consulta y el \'indice \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+%% ============================================================
+\section{Exploraci\'on}
+%% ============================================================
+
+Se realizaron \textbf{once gr\'aficos exploratorios} para investigar las hip\'otesis
+planteadas y describir el dataset desde m\'ultiples dimensiones: calidad de datos,
+balance de resultados, eficiencia econ\'omica, meta de h\'eroes, rendimiento de
+combate, control de visi\'on, objetivos, duraci\'on, evoluci\'on temporal y
+correlaciones con la variable objetivo. A continuaci\'on se presenta cada
+visualizaci\'on con su descripci\'on detallada y los hallazgos obtenidos.
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 1 --- Distribuci\'on de partidas v\'alidas e inv\'alidas por a\~no}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.95\linewidth]{grafico1.png}
+\imagenplaceholder{Gr\'afico 1 --- grafico1.png}{Barras apiladas: partidas con h\'eroes (azul) vs.\ anomal\'ias sin historial (rojo) por a\~no (2019, 2020, 2021). Porcentaje de anomal\'ia etiquetado en rojo sobre cada barra.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras apiladas que desglosa, para
+cada a\~no del periodo analizado (2019, 2020 y 2021), la cantidad de partidas
+\textbf{v\'alidas} (aquellas que tienen al menos un h\'eroe con pick rate $>$ 0 en
+ambos equipos, \texttt{\_has\_heroes = True}) frente a las partidas
+\textbf{an\'omalas} (\texttt{\_has\_heroes = False}). Las barras azules representan
+las partidas v\'alidas y las rojas las anomal\'ias. El porcentaje de anomal\'ia
+por a\~no se etiqueta en rojo sobre la barra correspondiente.
+
+\textbf{Metodolog\'ia:} Se calcula la columna \texttt{\_has\_heroes} como la
+intersecci\'on l\'ogica de \texttt{\_has\_heroes\_r} y \texttt{\_has\_heroes\_d},
+donde cada flag indica si al menos un h\'eroe del equipo tiene valor $>$ 0 en la
+ventana hist\'orica. Las partidas an\'omalas corresponden a equipos sin historial
+registrado en OpenDota (debutantes, datos faltantes en la API).
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item El total de anomal\'ias es de $\sim$2\,819 partidas, equivalente a
+        aproximadamente el \textbf{6\,\%} del dataset.
+  \item La tasa de anomal\'ia es relativamente estable entre a\~nos, lo que
+        indica que el problema de datos faltantes no se concentra en ning\'un
+        periodo espec\'ifico.
+  \item El a\~no 2020 concentra el mayor volumen absoluto de partidas (47.4\,\%
+        del total), pero no la mayor proporci\'on de anomal\'ias.
+  \item Estas anomal\'ias se excluyen del an\'alisis de h\'eroes y del modelo KNN,
+        pero se conservan para el an\'alisis de estad\'isticas globales con
+        imputaci\'on de la media.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 2 --- Win Rate global: Radiant vs.\ Dire}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.55\linewidth]{grafico2.png}
+\imagenplaceholder{Gr\'afico 2 --- grafico2.png}{Gr\'afico donut: Radiant $\approx$52.1\,\% (azul) vs.\ Dire $\approx$47.9\,\% (rojo), calculado sobre las partidas v\'alidas.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico tipo \textit{donut} (anillo) que muestra
+la distribuci\'on porcentual de victorias entre Radiant y Dire sobre las 44\,331
+partidas v\'alidas (con historial de h\'eroes). El grosor del anillo es de 0.55
+unidades. Los porcentajes se calculan directamente sobre la columna booleana
+\texttt{radiant\_win}.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item \textbf{Radiant gana el 52.1\,\%} de las partidas v\'alidas y Dire
+        el 47.9\,\%.
+  \item Esta diferencia de $\sim$4.2 puntos porcentuales es estad\'isticamente
+        significativa sobre una muestra de m\'as de 44\,000 partidas.
+  \item El sesgo de mapa es un fen\'omeno bien documentado en Dota~2 competitivo:
+        la base de Radiant se ubica en la esquina inferior izquierda, con acceso
+        m\'as directo al objetivo de Roshan y a los creeps de jungla de mayor valor.
+  \item Este desequilibrio implica que cualquier modelo predictivo debe considerar
+        el equipo (Radiant vs.\ Dire) como variable relevante.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 3 --- GPM y XPM: Radiant vs.\ Dire}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico3.png}
+\imagenplaceholder{Gr\'afico 3 --- grafico3.png}{Barras agrupadas: GPM y XPM promedio global de Radiant (azul) vs.\ Dire (rojo). Valor absoluto etiquetado sobre cada barra.}
+
+\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que comparan el promedio global
+de \texttt{gold\_per\_min\_avg} (GPM) y \texttt{xp\_per\_min\_avg} (XPM) entre
+Radiant y Dire calculados sobre todas las partidas v\'alidas. Cada par de barras
+representa una m\'etrica. El valor promedio se etiqueta sobre cada barra.
+
+\textbf{Metodolog\'ia:} Se calculan los promedios directamente de las columnas
+\texttt{gold\_per\_min\_avg\_r}, \texttt{gold\_per\_min\_avg\_d},
+\texttt{xp\_per\_min\_avg\_r} y \texttt{xp\_per\_min\_avg\_d} del subconjunto
+\texttt{df\_valid}.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Radiant presenta un GPM ligeramente superior al de Dire, consistente con
+        su mayor tasa de victorias (los equipos ganadores acumulan m\'as oro).
+  \item El XPM sigue el mismo patr\'on: mayor para Radiant en promedio.
+  \item La diferencia en GPM y XPM es peque\~na en t\'erminos absolutos cuando
+        se promedia sobre todo el dataset, porque el resultado de la partida
+        no est\'a controlado --- ambos equipos aparecen como ganadores y
+        perdedores en diferentes filas.
+  \item Esto refuerza la hip\'otesis 1: la ventaja econ\'omica de Radiant no es
+        solo estructural de mapa, sino que se refleja en las m\'etricas
+        hist\'oricas de eficiencia.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 4 --- Win Rate de los Top 50 H\'eroes m\'as elegidos}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.95\linewidth]{grafico4.png}
+\imagenplaceholder{Gr\'afico 4 --- grafico4.png}{Barras verticales: win rate (\%) de los 50 h\'eroes con mayor frecuencia de pick, ordenados de mayor a menor win rate. Verde $\geq$55\,\%, rojo $\leq$45\,\%, dorado = rango neutro.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico de 50 barras verticales que muestra el
+win rate individual de cada uno de los 50 h\'eroes m\'as utilizados en el dataset.
+La \textbf{frecuencia} de un h\'eroe se calcula como la \textbf{suma acumulada de
+sus pick rates} (no como conteo de partidas), lo que pondera habilidades elegidas
+consistentemente sobre muchas partidas. Las barras se ordenan de mayor a menor win
+rate para una lectura fluida, y se colorean seg\'un tres umbrales: verde
+($\geq$55\,\%), rojo ($\leq$45\,\%) y dorado (rango intermedio). L\'ineas de
+referencia horizontales a 45\,\%, 50\,\% y 55\,\%.
+
+\textbf{Metodolog\'ia:}
+\begin{enumerate}
+  \item Para cada h\'eroe $h$, se suma \texttt{hero\_h\_avg\_r.fillna(0)} sobre
+        todas las filas ($\text{freq\_r}$) y equivalente para Dire.
+  \item Las victorias se cuentan: si Radiant tiene el h\'eroe y gan\'o
+        (\texttt{radiant\_win = True}) suma como victoria; si est\'a en Dire y
+        perdi\'o Radiant (\texttt{radiant\_win = False}), tambi\'en.
+  \item $\text{WR}(h) = \text{wins}(h) / \text{partidas}(h) \times 100$.
+  \item Solo se incluyen h\'eroes con $\geq$50 partidas de aparici\'on.
+\end{enumerate}
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Existe un rango relativamente estrecho de win rates (aproximadamente
+        43--57\,\%) en el \'ambito profesional, lo que indica que el balance del
+        meta es alto.
+  \item Los h\'eroes con win rate $\geq$55\,\% son los considerados ``meta'' o
+        sobrevaluados en el parche analizado.
+  \item Los h\'eroes con win rate $\leq$45\,\% son frecuentes a pesar de su baja
+        efectividad, lo que sugiere que su uso responde a estrategias espec\'ificas
+        o al drafting del equipo contrario.
+  \item La metodolog\'ia de suma de pick rates (en lugar de conteo de filas)
+        garantiza que el ranking sea id\'entico al de la aplicaci\'on web, donde
+        un h\'eroe elegido con alta tasa en pocas partidas pesa m\'as que uno
+        elegido puntualmente en muchas.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 5 --- KDA: ganadores vs.\ perdedores}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico5.png}
+\imagenplaceholder{Gr\'afico 5 --- grafico5.png}{Histograma de densidad superpuesto: KDA hist\'orico de equipos ganadores (verde) vs.\ perdedores (rojo), con l\'ineas verticales de media. Rango del eje X: 0.5 -- 8.}
+
+\textbf{Descripci\'on t\'ecnica:} Histograma de densidad superpuesto que compara
+la distribuci\'on del KDA hist\'orico (\texttt{kda\_avg}) entre los equipos que
+ganaron y los que perdieron en cada partida. Para cada partida v\'alida, el equipo
+ganador es Radiant cuando \texttt{radiant\_win = True}, o Dire en caso contrario.
+Los valores se recortan al rango $[0.5,\, 8]$ para eliminar outliers extremos.
+Las l\'ineas verticales punteadas indican la media de cada distribuci\'on.
+
+\textbf{Metodolog\'ia:} Se extraen los KDA de ganadores concatenando
+\texttt{kda\_avg\_r} (cuando Radiant gana) con \texttt{kda\_avg\_d} (cuando Dire
+gana), y an\'alogamente para perdedores. Se usa la funci\'on de densidad (no
+frecuencia absoluta) para hacer comparables distribuciones de tama\~nos similares.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Los equipos \textbf{ganadores} presentan una distribuci\'on de KDA
+        desplazada hacia la derecha respecto a los perdedores, con media
+        significativamente mayor.
+  \item La superposici\'on de distribuciones indica que el KDA no es un predictor
+        perfecto: un equipo puede ganar con KDA bajo (por objetivos, no por
+        combate) o perder con KDA alto (si cede torres).
+  \item Apoya la hip\'otesis 2: mayor KDA hist\'orico se asocia con mayor
+        probabilidad de victoria, aunque no de forma determinista.
+  \item La cola derecha de los ganadores es m\'as larga, indicando que los equipos
+        con rendimiento excepcional de combate casi siempre ganan.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 6 --- Control de visi\'on: wards colocadas y destruidas}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico6.png}
+\imagenplaceholder{Gr\'afico 6 --- grafico6.png}{Barras agrupadas: 4 m\'etricas de visi\'on (observer colocadas, observer destruidas, sentry colocadas, sentry destruidas) comparadas entre ganadores (verde) y perdedores (rojo). Valor promedio etiquetado sobre cada barra.}
+
+\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que comparan cuatro m\'etricas
+de control de visi\'on entre equipos ganadores y perdedores: wards
+\textbf{observer} colocadas (\texttt{observer\_uses\_avg}), wards observer
+\textbf{destruidas} (\texttt{observer\_kills\_avg}), wards \textbf{sentry}
+colocadas (\texttt{sentry\_uses\_avg}) y wards sentry \textbf{destruidas}
+(\texttt{sentry\_kills\_avg}). Cada par de barras agrupa ganador (verde) vs.\
+perdedor (rojo) por m\'etrica.
+
+\textbf{Metodolog\'ia:} Se utiliza la funci\'on \texttt{split\_win\_lose(col\_r,
+col\_d)} que separa los valores por resultado, concatenando el equipo correcto
+(Radiant o Dire) seg\'un \texttt{radiant\_win}. Los promedios se calculan sobre
+todas las partidas v\'alidas.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Los equipos ganadores colocan \textbf{m\'as} wards observer y sentry
+        que los perdedores, indicando mayor inversi\'on en informaci\'on.
+  \item Los ganadores tambi\'en \textbf{destruyen m\'as} wards enemigas,
+        lo que se conoce como ``desvisi\'on'' activa.
+  \item La diferencia es m\'as pronunciada en observer kills que en sentry kills,
+        sugiriendo que negar la visi\'on pasiva del enemigo es m\'as diferenciador.
+  \item Apoya la hip\'otesis 3: la guerra de visi\'on es un diferenciador
+        estad\'isticamente real en el circuito profesional.
+  \item Equipos con mejor visi\'on toman mejores decisiones de mapa (ganks,
+        rotaciones, objetivos), lo que se traduce directamente en ventaja de
+        recursos.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 7 --- Torres vs.\ Kills: ¿qu\'e predice mejor la victoria?}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico7.png}
+\imagenplaceholder{Gr\'afico 7 --- grafico7.png}{Barras horizontales: diferencia relativa ganador $-$ perdedor (\%) para 5 objetivos (torres destruidas, kills de h\'eroes, da\~no a torres, kills de Roshan, kills de neutrales). Verde = ventaja positiva.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras horizontales que cuantifica
+la \textbf{diferencia relativa} entre ganadores y perdedores para cinco tipos de
+objetivos: torres destruidas (\texttt{tower\_kills\_avg}), kills de h\'eroes
+(\texttt{hero\_kills\_avg}), da\~no a torres (\texttt{tower\_damage\_avg}), kills
+de Roshan (\texttt{roshan\_kills\_avg}) y kills de neutrales
+(\texttt{neutral\_kills\_avg}). La diferencia relativa se calcula como:
+
+$$\Delta_{\%}(m) = \frac{\bar{m}_\text{ganador} - \bar{m}_\text{perdedor}}{\bar{m}_\text{perdedor}} \times 100$$
+
+Las barras verdes indican que el ganador supera al perdedor. El valor se etiqueta
+al extremo de cada barra.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item \textbf{Las torres destruidas} presentan la mayor diferencia relativa
+        entre ganadores y perdedores, confirmando la hip\'otesis 5: las torres
+        son el predictor m\'as fuerte del resultado.
+  \item El \textbf{da\~no a torres} es el segundo diferenciador m\'as grande,
+        lo que indica que el trabajo de siegeo (asedio a estructuras) es clave.
+  \item Las \textbf{kills de h\'eroes} tienen una diferencia positiva pero menor,
+        lo que sugiere que ganar combates no garantiza la victoria si no se
+        traduce en objetivos estructurales.
+  \item Los \textbf{kills de Roshan} muestran cierta diferencia, pero son
+        relativamente bajos en valor absoluto (Roshan no siempre se mata).
+  \item Los \textbf{kills de neutrales} son los menos diferenciadores, pues
+        ambos equipos farman la jungla de manera similar independientemente del
+        resultado.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 8 --- Duraci\'on de partidas: ganando vs.\ perdiendo}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.95\linewidth]{grafico8.png}
+\imagenplaceholder{Gr\'afico 8 --- grafico8.png}{Panel izquierdo: histograma de densidad superpuesto de duraci\'on en victorias (verde) vs.\ derrotas (rojo) para Radiant, con l\'ineas de media. Panel derecho: boxplot comparativo de ambas distribuciones.}
+
+\textbf{Descripci\'on t\'ecnica:} Figura de dos paneles. El panel izquierdo es un
+histograma de densidad superpuesto que compara la distribuci\'on de
+\texttt{duration\_avg\_win\_r} (duraci\'on promedio hist\'orica en victorias de
+Radiant) contra \texttt{duration\_avg\_lose\_r} (en derrotas). El panel derecho
+presenta un boxplot comparativo entre ambas distribuciones. Los valores est\'an
+en minutos (la columna original est\'a en segundos y se divide entre 60).
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Los equipos de Radiant tienen una duraci\'on promedio de victoria
+        \textbf{menor} que su duraci\'on promedio de derrota.
+  \item Esto confirma un principio conocido en Dota~2: los equipos \textbf{ganan
+        m\'as r\'apido} de lo que pierden, porque el equipo ganador ejecuta la
+        victoria cuando tiene ventaja, mientras que el equipo perdedor alarga el
+        juego buscando una remontada (\textit{comeback}).
+  \item El boxplot muestra mayor varianza en las derrotas, lo que indica que la
+        duraci\'on de los juegos perdidos es m\'as impredecible.
+  \item Partidas muy largas ($>$50 min) suelen corresponder a derrotas o a
+        partidas muy parejas donde la ventaja se escap\'o.
+  \item Relevante para la hip\'otesis 4: en partidas largas, Roshan se mata
+        m\'as veces y su impacto relativo aumenta.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 9 --- GPM por a\~no: ganadores vs.\ perdedores}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico9.png}
+\imagenplaceholder{Gr\'afico 9 --- grafico9.png}{Barras agrupadas por a\~no (2019, 2020, 2021): GPM promedio de ganadores (verde) vs.\ perdedores (rojo). Valor absoluto etiquetado sobre cada barra.}
+
+\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que muestran, para cada a\~no
+del periodo analizado (2019, 2020, 2021), el GPM (\texttt{gold\_per\_min\_avg})
+promedio de los equipos ganadores frente a los perdedores. El an\'alisis se
+realiza sobre el subconjunto de partidas v\'alidas de cada a\~no. Cada par de
+barras representa un a\~no, con barra verde para ganadores y roja para perdedores.
+
+\textbf{Metodolog\'ia:} Se filtra \texttt{df\_valid} por \texttt{\_year} y se
+separan los GPM de ganadores y perdedores usando \texttt{split\_win\_lose} por
+a\~no, concatenando Radiant (cuando \texttt{radiant\_win = True}) y Dire (cuando
+\texttt{radiant\_win = False}).
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item La brecha de GPM entre ganadores y perdedores se mantiene
+        \textbf{consistente en los tres a\~nos}, lo que confirma que la eficiencia
+        econ\'omica es un predictor estable del resultado a lo largo del tiempo.
+  \item El GPM promedio general aument\'o entre 2019 y 2021, reflejando la
+        evoluci\'on del meta profesional hacia juegos con mayor ritmo de farm.
+  \item La diferencia absoluta entre ganadores y perdedores es de
+        aproximadamente 30--50 GPM en todos los a\~nos.
+  \item Esto valida la hip\'otesis 1 de forma temporal: la eficiencia econ\'omica
+        no es un artefacto de un parche espec\'ifico, sino una constante
+        estructural del juego profesional.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 10 --- Tama\~no de ventana hist\'orica y estabilidad del win rate}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.85\linewidth]{grafico10.png}
+\imagenplaceholder{Gr\'afico 10 --- grafico10.png}{Barras (eje izquierdo, cian): win rate promedio (\%) por bucket de ventana hist\'orica con barras de error (desv.\ est.). L\'inea superpuesta (eje derecho, dorado): N\'umero de partidas por bucket. Buckets: 1--10, 11--30, 31--60, 61--100, 101--200, 201+.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico combinado con doble eje Y. El eje
+izquierdo (barras cianas) muestra el win rate promedio (\texttt{win\_pct\_r})
+por tramo de tama\~no de ventana hist\'orica (\texttt{freq\_r}), agrupado en
+6 buckets: 1--10, 11--30, 31--60, 61--100, 101--200 y 201+. Las barras de error
+representan la desviaci\'on est\'andar del win rate dentro de cada bucket. El eje
+derecho (l\'inea dorada) muestra el n\'umero de partidas en cada bucket.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item Los equipos con \textbf{ventana hist\'orica peque\~na} (1--10 partidas)
+        presentan una \textbf{mayor desviaci\'on est\'andar} en su win rate,
+        lo que indica que sus estad\'isticas son menos representativas.
+  \item A medida que aumenta \texttt{freq\_r}, la desviaci\'on est\'andar del
+        win rate se reduce: con m\'as historial, las m\'etricas convergen a
+        valores m\'as confiables.
+  \item El bucket 201+ tiene el menor error, aunque tambi\'en el menor n\'umero
+        de partidas (equipos muy activos).
+  \item Este hallazgo justifica el uso de la media columnar para imputar valores
+        faltantes: los equipos sin historial ser\'an asignados al promedio global,
+        que es la mejor estimaci\'on disponible.
+  \item Es relevante para el modelo KNN: distancias calculadas sobre equipos con
+        poca historia son menos confiables que las de equipos con $>$60 partidas
+        hist\'oricas.
+\end{itemize}
+
+% ------------------------------------------------------------------
+\subsection{Gr\'afico 11 --- Correlaci\'on de estad\'isticas con la victoria}
+
+% Para insertar la imagen real, reemplazar el bloque siguiente por:
+% \includegraphics[width=0.95\linewidth]{grafico11.png}
+\imagenplaceholder{Gr\'afico 11 --- grafico11.png}{Barras horizontales: correlaci\'on de Pearson de 17 estad\'isticas de Radiant con \texttt{radiant\_win}, ordenadas de mayor a menor. Verde = correlaci\'on positiva, rojo = negativa.}
+
+\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras horizontales que muestra el
+\textbf{coeficiente de correlaci\'on de Pearson} entre 17 estad\'isticas
+seleccionadas de Radiant y la variable objetivo \texttt{radiant\_win}. Las
+estad\'isticas incluyen: \texttt{win\_pct}, \texttt{kda\_avg},
+\texttt{gold\_per\_min\_avg}, \texttt{xp\_per\_min\_avg}, \texttt{hero\_kills\_avg},
+\texttt{deaths\_avg}, \texttt{assists\_avg}, \texttt{tower\_kills\_avg},
+\texttt{tower\_damage\_avg}, \texttt{roshan\_kills\_avg},
+\texttt{observer\_uses\_avg}, \texttt{sentry\_uses\_avg}, \texttt{last\_hits\_avg},
+\texttt{denies\_avg}, \texttt{neutral\_kills\_avg},
+\texttt{firstblood\_claimed\_avg} y \texttt{buyback\_count\_avg}. Las barras se
+colorean en verde si la correlaci\'on es positiva y en rojo si es negativa, y se
+ordenan de mayor a menor correlaci\'on.
+
+\textbf{Metodolog\'ia:} Se calcula la matriz de correlaci\'on de Pearson sobre
+\texttt{df\_valid} para las 17 features seleccionadas m\'as \texttt{radiant\_win},
+y se extrae la columna correspondiente a \texttt{radiant\_win}.
+
+\textbf{Hallazgos:}
+\begin{itemize}
+  \item \texttt{win\_pct\_r} tiene la \textbf{correlaci\'on m\'as alta} con
+        \texttt{radiant\_win}, lo que es esperado: la tasa de victorias hist\'orica
+        predice victorias futuras.
+  \item \texttt{kda\_avg\_r}, \texttt{gold\_per\_min\_avg\_r} y
+        \texttt{xp\_per\_min\_avg\_r} tienen correlaciones positivas moderadas,
+        confirmando las hip\'otesis 1 y 2.
+  \item \texttt{deaths\_avg\_r} tiene la \textbf{correlaci\'on negativa m\'as
+        fuerte}: m\'as muertes hist\'oricas predicen menor probabilidad de ganar.
+  \item \texttt{tower\_kills\_avg\_r} tiene mayor correlaci\'on que
+        \texttt{hero\_kills\_avg\_r}, apoyando la hip\'otesis 5.
+  \item Variables como \texttt{buyback\_count\_avg\_r} tienen correlaciones
+        pr\'acticamente nulas, lo que indica que el uso de buybacks no discrimina
+        ganadores de perdedores.
+  \item Este gr\'afico sirve como \textbf{mapa de importancia de variables} para
+        orientar futuros modelos de clasificaci\'on supervisados sobre este dataset.
+\end{itemize}
+
+%% ============================================================
+\section{Conclusi\'on}
+%% ============================================================
+
+\subsection*{Hip\'otesis 1 --- Eficiencia econ\'omica como predictor de victoria}
+
+\textbf{Conclusi\'on:} Los gr\'aficos 3, 9 y 11 confirman que el GPM y el XPM son
+predictores positivos y consistentes de la victoria en Dota~2 profesional. La
+brecha de GPM entre ganadores y perdedores se mantiene estable en los tres a\~nos
+analizados ($\sim$30--50 GPM de diferencia). El GPM ocupa un lugar prominente en
+el ranking de correlaci\'on de Pearson con \texttt{radiant\_win}. Los equipos con
+mayor eficiencia econ\'omica adquieren \'items m\'as poderosos antes que sus
+rivales, generando una ventaja de combate compuesta y sostenida.
+
+\subsection*{Hip\'otesis 2 --- KDA hist\'orico y tasa de victorias}
+
+\textbf{Conclusi\'on:} El gr\'afico 5 muestra una separaci\'on clara de las
+distribuciones de KDA entre ganadores y perdedores. Los equipos con
+\texttt{kda\_avg} $>$ 3.5 presentan win rates notablemente superiores. El KDA
+captura sint\'eticamente el rendimiento de combate: m\'as kills y asistencias con
+menos muertes implica mayor control de los enfrentamientos y mayor acumulaci\'on
+de recursos para el equipo. El gr\'afico 11 confirma que \texttt{kda\_avg\_r}
+es la segunda variable con mayor correlaci\'on positiva tras \texttt{win\_pct\_r}.
+
+\subsection*{Hip\'otesis 3 --- Control de visi\'on}
+
+\textbf{Conclusi\'on:} El gr\'afico 6 muestra diferencias sistem\'aticas en todas
+las m\'etricas de visi\'on entre ganadores y perdedores. Los equipos ganadores
+invierten m\'as en wards (observer y sentry) y destruyen m\'as wards enemigas. La
+``guerra de visi\'on'' es un diferenciador real en el circuito profesional: la
+informaci\'on del mapa permite decisiones t\'acticas superiores (ganks, rotaciones,
+toma de objetivos) que se traducen en ventajas econ\'omicas y estructurales.
+
+\subsection*{Hip\'otesis 4 --- Roshan y duraci\'on}
+
+\textbf{Conclusi\'on:} El gr\'afico 7 muestra que los kills de Roshan tienen una
+diferencia relativa positiva entre ganadores y perdedores, aunque menor que la de
+torres. El gr\'afico 8 confirma que en partidas largas (donde Roshan se mata m\'as
+veces) la varianza del resultado aumenta. Matar a Roshan otorga el Aegis (vida
+extra) y una importante recompensa de oro y XP, lo que permite ejecutar combates
+de alto riesgo en las etapas tard\'ias de la partida.
+
+\subsection*{Hip\'otesis 5 --- Torres vs.\ kills de h\'eroes}
+
+\textbf{Conclusi\'on:} El gr\'afico 7 demuestra que \texttt{tower\_kills\_avg}
+tiene la mayor diferencia relativa entre ganadores y perdedores ($>$50\,\%),
+superando a \texttt{hero\_kills\_avg} ($\sim$20--30\,\%). El gr\'afico 11 confirma
+este resultado con correlaciones de Pearson: las torres son m\'as predictivas del
+resultado que los kills. Esto es consistente con el dise\~no del juego: el objetivo
+final es destruir el Ancient, que solo es accesible tras eliminar todas las torres
+defensivas.
+
+\subsection*{Hallazgos adicionales}
+
+\begin{itemize}
+  \item \textbf{Sesgo de mapa (Gr\'afico 2):} Radiant mantiene una ventaja global
+        del 52.1\,\% de manera constante, lo que debe considerarse como variable
+        de control en cualquier modelo predictivo.
+  \item \textbf{Calidad de datos (Gr\'afico 1):} El 6\,\% de anomal\'ias es
+        manejable y se distribuye uniformemente entre a\~nos, sin comprometer la
+        validez del an\'alisis.
+  \item \textbf{Duraci\'on (Gr\'afico 8):} Los equipos ganan m\'as r\'apido de
+        lo que pierden, lo que confirma que el equipo con ventaja ejecuta el cierre
+        del juego activamente.
+  \item \textbf{Estabilidad temporal (Gr\'afico 9):} Los patrones de eficiencia
+        econ\'omica se mantienen consistentes en 2019--2021, lo que valida
+        la generalizabilidad del modelo.
+  \item \textbf{Confiabilidad del historial (Gr\'afico 10):} Las ventanas
+        hist\'oricas $>$60 partidas producen estad\'isticas m\'as estables,
+        lo que orienta el umbral m\'inimo para confiar en las predicciones del KNN.
+  \item \textbf{Mapa de importancia (Gr\'afico 11):} El ranking de correlaciones
+        orienta la selecci\'on de features para modelos supervisados futuros
+        (regresi\'on log\'istica, Random Forest, XGBoost).
+\end{itemize}
+
+\subsection*{Conclusi\'on general}
+
+\begin{itemize}
+  \item El dataset de 47\,150 partidas profesionales contiene informaci\'on
+        hist\'orica rica y multidimensional que permite identificar patrones de
+        rendimiento estad\'isticamente significativos.
+  \item Radiant mantiene una ventaja global del 52.1\,\%, consistente con el sesgo
+        de mapa documentado en Dota~2 competitivo.
+  \item Las 66 features seleccionadas para el KNN capturan dimensiones reales de
+        rendimiento y permiten recuperar partidas estructuralmente similares.
+  \item La normalizaci\'on con StandardScaler es imprescindible dado el rango
+        heterog\'eneo de las variables (GPM $\sim$400 vs.\ Roshan $\sim$0.3).
+  \item Las partidas sin historial ($\sim$6\,\%) son gestionables mediante
+        imputaci\'on con la media columnar sin comprometer el modelo KNN.
+  \item La combinaci\'on de ventanas hist\'oricas y KNN es un enfoque s\'olido para
+        el an\'alisis de esports competitivos, extensible a modelos predictivos
+        de mayor complejidad.
+\end{itemize}
+
+\newpage
+\section*{Referencias}
+\addcontentsline{toc}{section}{Referencias}
+
+\begin{enumerate}
+  \item\label{ref:kaggle} Calvo, T. (2021). \textit{Dota 2 Pro Players Matches
+        2019--2021} [Dataset]. Kaggle.
+        Disponible en: \url{https://www.kaggle.com/datasets/teocalvo/dota2-pro-players-matches-2019-202106/data}
+  \item\label{ref:paper} Calvo, T. et al.\ (2021). \textit{Predicting the Outcome
+        of Dota 2 Professional Matches}. arXiv preprint arXiv:2106.01782.
+        Disponible en: \url{https://arxiv.org/pdf/2106.01782}
+  \item\label{ref:sklearn} Pedregosa et al.\ \textit{Scikit-learn: Machine
+        Learning in Python}. Journal of Machine Learning Research, 12, 2011.
+  \item\label{ref:valve} Valve Corporation. \textit{Dota 2 --- Portal oficial}.
+        Disponible en: \url{https://www.dota2.com/}
+\end{enumerate}
+
+\end{document}

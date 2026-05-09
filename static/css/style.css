@@ -457,3 +457,187 @@ body {
   .hero-meta-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .hero-circle-img, .hero-circle-wrapper, .hero-circle-fallback { width: 56px; height: 56px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DETALLE DE PARTIDA — Nuevo diseño agrupado
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Cabecera del detalle */
+.detalle-header {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  flex-wrap: wrap;
+  margin-bottom: .85rem;
+  padding: .6rem 0;
+  border-bottom: 1px solid var(--dota-border);
+}
+.detalle-match-id {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--dota-gold);
+}
+.detalle-date {
+  color: var(--dota-muted);
+  font-size: .85rem;
+}
+.ventana-badge {
+  font-size: .63rem;
+  opacity: .75;
+}
+
+/* Tira de métricas clave */
+.key-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: .6rem;
+  margin-bottom: .85rem;
+}
+.key-stat-card {
+  background: var(--dota-surface);
+  border: 1px solid var(--dota-border);
+  border-radius: 7px;
+  padding: .6rem .8rem;
+  cursor: help;
+  transition: border-color .15s;
+}
+.key-stat-card:hover { border-color: var(--dota-accent); }
+.ks-label {
+  font-size: .65rem;
+  color: var(--dota-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: .3rem;
+}
+.ks-values {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .88rem;
+  font-weight: 700;
+  margin-bottom: .35rem;
+}
+.ks-r   { color: var(--dota-radiant); font-variant-numeric: tabular-nums; }
+.ks-d   { color: var(--dota-dire);    font-variant-numeric: tabular-nums; }
+.ks-sep { color: var(--dota-muted); font-size: .65rem; font-weight: 400; }
+.ks-bar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+/* Grupos de estadísticas colapsables */
+.stat-group {
+  border-bottom: 1px solid var(--dota-border);
+}
+.stat-group:last-child { border-bottom: none; }
+.stat-group-header {
+  width: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem .3rem;
+  font-size: .76rem;
+  font-weight: 700;
+  color: var(--dota-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  cursor: pointer;
+  transition: color .15s;
+}
+.stat-group-header:hover { color: var(--dota-gold); }
+.stat-group-header[aria-expanded="true"] { color: var(--dota-text); }
+.stat-group-arrow {
+  font-size: .7rem;
+  transition: transform .2s;
+}
+.stat-group-header[aria-expanded="true"] .stat-group-arrow {
+  transform: rotate(180deg);
+}
+.stat-group-body {
+  display: none;
+  padding: 0 .2rem .3rem;
+}
+.stat-group-body.show { display: block; }
+
+/* Fila de stat rediseñada */
+.stat-row {
+  display: flex;
+  align-items: center;
+  padding: .35rem 0;
+  border-bottom: 1px solid rgba(31,42,60,.55);
+  font-size: .82rem;
+  cursor: help;
+  transition: background .1s;
+  gap: .5rem;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-row:hover { background: rgba(200,151,58,.04); border-radius: 4px; }
+.stat-val-r {
+  color: var(--dota-radiant);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  width: 70px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.stat-val-d {
+  color: var(--dota-dire);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  width: 70px;
+  text-align: left;
+  flex-shrink: 0;
+}
+.stat-mid {
+  flex: 1;
+  padding: 0 .6rem;
+}
+.stat-label {
+  color: var(--dota-muted);
+  font-size: .72rem;
+  text-align: center;
+  margin-bottom: 3px;
+}
+.stat-bar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+/* Lista de héroes en panel detalle */
+.hero-list-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem 0;
+  border-bottom: 1px solid var(--dota-border);
+}
+.hero-list-row:last-child { border-bottom: none; }
+.hero-detail-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 15%;
+  border: 1px solid var(--dota-border);
+  background: var(--dota-surface);
+  flex-shrink: 0;
+}
+.hero-detail-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--dota-surface);
+  border: 1px solid var(--dota-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dota-muted);
+  font-size: .9rem;
+  flex-shrink: 0;
+}

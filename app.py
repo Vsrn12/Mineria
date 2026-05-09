@@ -29,6 +29,22 @@ knn_matrix    = None   # matriz normalizada usada para KNN
 knn_cols      = []     # columnas numéricas usadas en KNN
 scaler        = None   # StandardScaler ajustado
 load_time_ms  = 0
+anomaly_stats = {}     # Estadísticas de filas sin datos de héroes
+
+# ─── Helper columnas héroe ────────────────────────────────────────────────────
+def es_col_heroe(col):
+    """
+    Devuelve True si la columna es un pick rate de héroe (hero_<NUMBER>_avg_r/d).
+    Excluye hero_damage_avg, hero_healing_avg, hero_kills_avg (son stats, no heroes).
+    """
+    partes = col.split("_")
+    if len(partes) < 4:
+        return False
+    try:
+        int(partes[1])
+        return True
+    except ValueError:
+        return False
 
 # Columnas de estadísticas de equipo (sin hero_*) usadas para KNN y detalle
 STAT_COLS_BASE = [
@@ -53,12 +69,41 @@ STAT_COLS_BASE = [
 
 def cargar_datos():
     """Carga el CSV, limpia columnas irrelevantes y prepara el modelo KNN."""
-    global df_raw, knn_model, knn_matrix, knn_cols, scaler, load_time_ms
+    global df_raw, knn_model, knn_matrix, knn_cols, scaler, load_time_ms, anomaly_stats
 
     t0 = time.perf_counter()
     df = pd.read_csv(CSV_PATH)
 
-    # Columnas de estadísticas numéricas para Radiant y Dire
+    # ── Flags de presencia de héroes (calculados una sola vez) ──────────────
+    hero_cols_r_ids = [c for c in df.columns if c.startswith("hero_") and c.endswith("_avg_r") and es_col_heroe(c)]
+    hero_cols_d_ids = [c for c in df.columns if c.startswith("hero_") and c.endswith("_avg_d") and es_col_heroe(c)]
+    df["_has_heroes_r"] = (df[hero_cols_r_ids].fillna(0) > 0).any(axis=1)
+    df["_has_heroes_d"] = (df[hero_cols_d_ids].fillna(0) > 0).any(axis=1)
+    df["_has_heroes"]   = df["_has_heroes_r"] & df["_has_heroes_d"]
+
+    # ── Estadísticas de anomalías (partidas sin datos de héroes) ────────────
+    n_valid            = int(df["_has_heroes"].sum())
+    n_both_missing     = int((~df["_has_heroes_r"] & ~df["_has_heroes_d"]).sum())
+    n_r_only_missing   = int((~df["_has_heroes_r"] &  df["_has_heroes_d"]).sum())
+    n_d_only_missing   = int(( df["_has_heroes_r"] & ~df["_has_heroes_d"]).sum())
+    df["_year"] = pd.to_datetime(df["dt_match"], errors="coerce").dt.year
+    by_year = (
+        df.groupby("_year")["_has_heroes"]
+        .agg(total="count", valid="sum")
+        .reset_index()
+    )
+    by_year["invalid"] = by_year["total"] - by_year["valid"]
+    anomaly_stats = {
+        "total":           len(df),
+        "valid":           n_valid,
+        "no_heroes_both":  n_both_missing,
+        "no_heroes_r":     n_r_only_missing,
+        "no_heroes_d":     n_d_only_missing,
+        "total_invalid":   n_both_missing + n_r_only_missing + n_d_only_missing,
+        "by_year":         by_year.to_dict("records"),
+    }
+
+    # ── Columnas de estadísticas numéricas para Radiant y Dire ──────────────
     cols_r = [f"{c}_r" for c in STAT_COLS_BASE if f"{c}_r" in df.columns]
     cols_d = [f"{c}_d" for c in STAT_COLS_BASE if f"{c}_d" in df.columns]
     knn_cols_local = cols_r + cols_d
@@ -79,7 +124,7 @@ def cargar_datos():
     knn_model    = modelo
     scaler       = sc
     load_time_ms = round((time.perf_counter() - t0) * 1000, 1)
-    print(f"[OK] Dataset cargado: {len(df)} partidas en {load_time_ms} ms")
+    print(f"[OK] Dataset cargado: {len(df)} partidas | válidas: {n_valid} | sin héroes: {anomaly_stats['total_invalid']} | {load_time_ms} ms")
 
 
 def obtener_hero_nombres():
@@ -203,7 +248,8 @@ def api_partidas():
     por_pag  = int(request.args.get("per_page", 20))
     ganador  = request.args.get("ganador", "todos")
 
-    df = df_raw.copy()
+    # Filtrar partidas sin datos de héroes (usuario no puede verlas útilmente)
+    df = df_raw[df_raw["_has_heroes"] == True].copy()
 
     if ganador == "radiant":
         df = df[df["radiant_win"] == True]
@@ -311,16 +357,6 @@ def api_heroes_meta():
 
     # Solo columnas con ID numérico: hero_<NUMBER>_avg_r/d
     # Excluye hero_damage_avg_r, hero_healing_avg_r, hero_kills_avg_r (son stats, no heroes)
-    def es_col_heroe(col):
-        partes = col.split("_")
-        if len(partes) < 4:
-            return False
-        try:
-            int(partes[1])
-            return True
-        except ValueError:
-            return False
-
     hero_cols_r = [c for c in df_raw.columns if c.startswith("hero_") and c.endswith("_avg_r") and es_col_heroe(c)]
     hero_cols_d = [c for c in df_raw.columns if c.startswith("hero_") and c.endswith("_avg_d") and es_col_heroe(c)]
 
@@ -417,6 +453,8 @@ def api_knn():
         mid  = int(fila["match_id"])
         if mid == match_id:
             continue
+        heroes_r = extraer_heroes_equipo(fila, "r")[:5]
+        heroes_d = extraer_heroes_equipo(fila, "d")[:5]
         similares.append({
             "match_id":    mid,
             "dt_match":    str(fila.get("dt_match", "")),
@@ -426,6 +464,8 @@ def api_knn():
             "win_pct_d":   round(float(fila.get("win_pct_d", 0) or 0), 3),
             "kda_avg_r":   round(float(fila.get("kda_avg_r", 0) or 0), 3),
             "kda_avg_d":   round(float(fila.get("kda_avg_d", 0) or 0), 3),
+            "heroes_r":    heroes_r,
+            "heroes_d":    heroes_d,
         })
         if len(similares) >= k:
             break
@@ -442,6 +482,101 @@ def api_knn():
         },
         "similares": similares,
         "k": k,
+    })
+
+
+# ─── API: gráficos ───────────────────────────────────────────────────────────
+
+@app.route("/api/graficos")
+def api_graficos():
+    """
+    Devuelve los datos para los 4 gráficos de la pestaña Gráficos:
+      1. Top 50 héroes por frecuencia + winrate
+      2. GPM y XPM promedio (equipo ganador vs perdedor)
+      3. Winrate global Radiant vs Dire
+      4. Estadísticas de anomalías (partidas sin datos de héroes)
+    """
+    nombres = obtener_hero_nombres()
+
+    # ── 1. Top 50 héroes ─────────────────────────────────────────────────────
+    hero_cols_r = [c for c in df_raw.columns if c.startswith("hero_") and c.endswith("_avg_r") and es_col_heroe(c)]
+    hero_cols_d = [c for c in df_raw.columns if c.startswith("hero_") and c.endswith("_avg_d") and es_col_heroe(c)]
+    resultados = {}
+
+    for col in hero_cols_r:
+        hid = int(col.split("_")[1])
+        freq_total = float(df_raw[col].fillna(0).sum())
+        mask = df_raw[col].fillna(0) > 0
+        part = df_raw[mask]
+        wins = int(part["radiant_win"].sum()) if len(part) > 0 else 0
+        if hid not in resultados:
+            resultados[hid] = {"freq": 0, "wins": 0, "total": 0}
+        resultados[hid]["freq"]  += freq_total
+        resultados[hid]["wins"]  += wins
+        resultados[hid]["total"] += len(part)
+
+    for col in hero_cols_d:
+        hid = int(col.split("_")[1])
+        freq_total = float(df_raw[col].fillna(0).sum())
+        mask = df_raw[col].fillna(0) > 0
+        part = df_raw[mask]
+        wins = int((~part["radiant_win"]).sum()) if len(part) > 0 else 0
+        if hid not in resultados:
+            resultados[hid] = {"freq": 0, "wins": 0, "total": 0}
+        resultados[hid]["freq"]  += freq_total
+        resultados[hid]["wins"]  += wins
+        resultados[hid]["total"] += len(part)
+
+    top50 = []
+    for hid, datos in resultados.items():
+        if datos["total"] == 0:
+            continue
+        info = nombres.get(hid, {"nombre": f"Héroe {hid}", "icono": ""})
+        top50.append({
+            "id":      hid,
+            "nombre":  info["nombre"],
+            "winrate": round(datos["wins"] / datos["total"] * 100, 1),
+            "freq":    round(datos["freq"], 1),
+            "partidas": datos["total"],
+        })
+    top50.sort(key=lambda x: x["freq"], reverse=True)
+    top50 = top50[:50]
+
+    # ── 2. GPM / XPM ganadores vs perdedores ─────────────────────────────────
+    df_v   = df_raw[df_raw["_has_heroes"] == True]
+    r_wins = df_v[df_v["radiant_win"] == True]
+    r_lose = df_v[df_v["radiant_win"] == False]
+
+    def safe_mean(series):
+        v = series.dropna().mean()
+        return round(float(v), 1) if not math.isnan(v) else 0.0
+
+    gpm_xpm = {
+        "winner_gpm":  safe_mean(pd.concat([r_wins["gold_per_min_avg_r"], r_lose["gold_per_min_avg_d"]])),
+        "loser_gpm":   safe_mean(pd.concat([r_wins["gold_per_min_avg_d"], r_lose["gold_per_min_avg_r"]])),
+        "winner_xpm":  safe_mean(pd.concat([r_wins["xp_per_min_avg_r"],   r_lose["xp_per_min_avg_d"]])),
+        "loser_xpm":   safe_mean(pd.concat([r_wins["xp_per_min_avg_r"],   r_lose["xp_per_min_avg_r"]])),
+        "radiant_gpm": safe_mean(df_v["gold_per_min_avg_r"]),
+        "dire_gpm":    safe_mean(df_v["gold_per_min_avg_d"]),
+        "radiant_xpm": safe_mean(df_v["xp_per_min_avg_r"]),
+        "dire_xpm":    safe_mean(df_v["xp_per_min_avg_d"]),
+    }
+
+    # ── 3. Winrate Radiant vs Dire ────────────────────────────────────────────
+    total_all   = len(df_raw)
+    rad_wins    = int(df_raw["radiant_win"].sum())
+    win_rates   = {
+        "radiant_wins": rad_wins,
+        "dire_wins":    total_all - rad_wins,
+        "radiant_pct":  round(rad_wins / total_all * 100, 1),
+        "dire_pct":     round((total_all - rad_wins) / total_all * 100, 1),
+    }
+
+    return jsonify({
+        "top50_heroes": top50,
+        "gpm_xpm":      gpm_xpm,
+        "win_rates":    win_rates,
+        "anomaly":      anomaly_stats,
     })
 
 
