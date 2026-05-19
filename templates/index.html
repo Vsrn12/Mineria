@@ -159,51 +159,42 @@
 
 <!-- TAB 5: GRÁFICOS -->
 <div id="tab-graficos" class="tab-panel">
+
+  <!-- Leyenda de hipótesis -->
+  <div class="card-dota mb-4" style="padding:1rem 1.4rem">
+    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem">
+      <i class="bi bi-lightbulb-fill" style="color:var(--dota-gold)"></i>
+      <span style="font-size:.82rem;font-weight:700;color:var(--dota-gold);text-transform:uppercase;letter-spacing:.06em">Hipótesis del análisis EDA</span>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;font-size:.78rem">
+      <span class="badge-hip badge-h1">H1 — GPM/XPM predicen victoria</span>
+      <span class="badge-hip badge-h2">H2 — KDA predice victoria</span>
+      <span class="badge-hip badge-h3">H3 — Visión diferencia resultados</span>
+      <span class="badge-hip badge-h4">H4 — Roshan define la partida</span>
+      <span class="badge-hip badge-h5">H5 — Torres &gt; Kills en impacto</span>
+      <span class="badge-hip badge-h6">H6 — Más historial = más estable</span>
+      <span class="badge-hip badge-h7">H7 — Partidas largas favorecen a Dire</span>
+    </div>
+  </div>
+
   <div class="row g-4">
-    <!-- Gráfico 1: Win Rate Top 50 Héroes -->
+
+    <!-- G1: Anomalías del dataset -->
     <div class="col-12">
       <div class="card-dota">
-        <div class="card-header-dota">
-          <i class="bi bi-bar-chart-fill" style="color:var(--dota-gold)"></i>
-          Win Rate de los Top 50 Héroes más usados
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-exclamation-triangle-fill" style="color:var(--dota-dire)"></i>
+            G1 — Partidas sin datos de héroes (anomalías por año)
+          </span>
+          <span class="badge-hip" style="background:rgba(100,110,130,.15);border-color:rgba(100,110,130,.4);color:var(--dota-muted)">Calidad de datos · EDA Paso 2</span>
         </div>
-        <div style="padding:1.2rem;position:relative;height:380px">
-          <canvas id="chartHeroes"></canvas>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Se detectaron partidas sin ninguna columna de héroe con valor &gt; 0 — equipos sin historial o registros incompletos en OpenDota.
+          Se excluyen del análisis. El volumen varía por año, con mayor concentración en 2019 (inicio del dataset).
+          <strong style="color:var(--dota-gold)">Variable clave: has_heroes (flag). Acción: filtrado previo al análisis.</strong>
         </div>
-      </div>
-    </div>
-    <!-- Gráfico 2: GPM y XPM -->
-    <div class="col-12 col-lg-6">
-      <div class="card-dota">
-        <div class="card-header-dota">
-          <i class="bi bi-coin" style="color:var(--dota-gold)"></i>
-          Oro y Experiencia por Minuto (Radiant vs Dire)
-        </div>
-        <div style="padding:1.2rem;position:relative;height:280px">
-          <canvas id="chartGpmXpm"></canvas>
-        </div>
-      </div>
-    </div>
-    <!-- Gráfico 3: Winrate R vs D -->
-    <div class="col-12 col-lg-6">
-      <div class="card-dota">
-        <div class="card-header-dota">
-          <i class="bi bi-pie-chart-fill" style="color:var(--dota-gold)"></i>
-          Victorias Radiant vs Dire (Dataset completo)
-        </div>
-        <div style="padding:1.2rem;position:relative;height:280px;display:flex;align-items:center;justify-content:center">
-          <canvas id="chartWinrate" style="max-width:260px"></canvas>
-        </div>
-      </div>
-    </div>
-    <!-- Gráfico 4: Anomalías -->
-    <div class="col-12">
-      <div class="card-dota">
-        <div class="card-header-dota" style="color:var(--dota-dire)">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          Partidas sin datos de héroes (anomalías del dataset)
-        </div>
-        <div style="padding:1.2rem">
+        <div style="padding:1rem 1.2rem">
           <div id="anomalyStats" style="margin-bottom:1rem"></div>
           <div style="position:relative;height:260px">
             <canvas id="chartAnomaly"></canvas>
@@ -211,6 +202,243 @@
         </div>
       </div>
     </div>
+
+    <!-- G2: Win Rate Radiant vs Dire -->
+    <div class="col-12 col-lg-5">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-pie-chart-fill" style="color:var(--dota-gold)"></i>
+            G2 — Victorias Radiant vs Dire
+          </span>
+          <span class="badge-hip" style="background:rgba(100,110,130,.15);border-color:rgba(100,110,130,.4);color:var(--dota-muted)">Balance de clases</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Distribución global de victorias. Un balance cercano a 50/50 confirma que el dataset no tiene sesgo por bando
+          y que los factores de rendimiento (GPM, KDA, visión) son los determinantes reales.
+          <strong style="color:var(--dota-gold)">Variable: radiant_win (bool).</strong>
+        </div>
+        <div style="padding:1rem;display:flex;align-items:center;justify-content:center;height:280px">
+          <canvas id="chartWinrate" style="max-width:260px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- G3: GPM y XPM (H1) -->
+    <div class="col-12 col-lg-7">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-coin" style="color:var(--dota-gold)"></i>
+            G3 — GPM y XPM: Radiant vs Dire
+          </span>
+          <span class="badge-hip badge-h1">H1 — GPM/XPM predicen victoria</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Oro por minuto (GPM) y experiencia por minuto (XPM) promedio para cada bando.
+          Si Radiant aventaja consistentemente en ambas métricas, se confirma que la ventaja económica y de nivel
+          predice el resultado.
+          <strong style="color:var(--dota-gold)">Variables: gold_per_min_avg_r/d, xp_per_min_avg_r/d.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:280px">
+          <canvas id="chartGpmXpm"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- G4: Top 50 héroes win rate -->
+    <div class="col-12">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-bar-chart-fill" style="color:var(--dota-gold)"></i>
+            G4 — Win Rate de los Top 50 Héroes más usados
+          </span>
+          <span class="badge-hip badge-h1">H1 — Eficiencia económica / Meta</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Los 50 héroes con mayor frecuencia de pick ordenados por win rate descendente.
+          Los héroes del meta pro con alta tasa de victoria tienden a ser carry/ganadores de oro eficientes,
+          validando la hipótesis H1 en términos de composición de equipo.
+          <strong style="color:var(--dota-gold)">Variables: hero_&lt;id&gt;_avg_r/d, radiant_win.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:380px">
+          <canvas id="chartHeroes"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- G5: KDA ganadores vs perdedores (H2) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-person-fill-slash" style="color:var(--dota-gold)"></i>
+            G5 — KDA: Ganadores vs Perdedores
+          </span>
+          <span class="badge-hip badge-h2">H2 — KDA predice victoria</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Ratio KDA promedio ((Kills + Asistencias) / Muertes) comparando equipos que ganaron vs los que perdieron.
+          Un KDA significativamente mayor en ganadores confirma que sobrevivir y participar en las kills
+          es determinante para ganar.
+          <strong style="color:var(--dota-gold)">Variable: kda_avg_r/d. Umbral relevante: KDA &gt; 3.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:260px">
+          <canvas id="chartKda"></canvas>
+        </div>
+        <div id="kdaHallazgo" style="padding:.5rem 1.2rem 1rem;font-size:.78rem;color:var(--dota-muted)"></div>
+      </div>
+    </div>
+
+    <!-- G6: Control de visión (H3) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-eye-fill" style="color:var(--dota-gold)"></i>
+            G6 — Control de Visión (Wards)
+          </span>
+          <span class="badge-hip badge-h3">H3 — Visión diferencia resultados</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Uso y destrucción de wards observer y sentry para ganadores vs perdedores.
+          Si los ganadores colocan más wards y destruyen más wards enemigas, se valida que la visión del mapa
+          es una ventaja decisiva en partidas profesionales.
+          <strong style="color:var(--dota-gold)">Variables: observer_uses_avg, sentry_uses_avg, observer_kills_avg, sentry_kills_avg.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:260px">
+          <canvas id="chartVision"></canvas>
+        </div>
+        <div id="visionHallazgo" style="padding:.5rem 1.2rem 1rem;font-size:.78rem;color:var(--dota-muted)"></div>
+      </div>
+    </div>
+
+    <!-- G7: Torres vs Kills — objetivos (H4, H5) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-buildings-fill" style="color:var(--dota-gold)"></i>
+            G7 — Objetivos: Torres, Kills, Roshan
+          </span>
+          <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+            <span class="badge-hip badge-h4">H4 — Roshan</span>
+            <span class="badge-hip badge-h5">H5 — Torres &gt; Kills</span>
+          </div>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Diferencia porcentual entre ganadores y perdedores para cada tipo de objetivo.
+          Si las torres destruidas tienen mayor diferencia porcentual que los kills de héroes,
+          se confirma H5. Si Roshan también diferencia notablemente, se valida H4.
+          <strong style="color:var(--dota-gold)">Variables: tower_kills_avg, hero_kills_avg, roshan_kills_avg.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:300px">
+          <canvas id="chartObjetivos"></canvas>
+        </div>
+        <div id="objetivosHallazgo" style="padding:.5rem 1.2rem 1rem;font-size:.78rem;color:var(--dota-muted)"></div>
+      </div>
+    </div>
+
+    <!-- G8: Duración ganando vs perdiendo (H4, H7) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-clock-history" style="color:var(--dota-gold)"></i>
+            G8 — Duración: cuando se gana vs cuando se pierde
+          </span>
+          <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+            <span class="badge-hip badge-h4">H4 — Partidas largas</span>
+            <span class="badge-hip badge-h7">H7 — Partidas largas ↔ Dire</span>
+          </div>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Duración promedio (en minutos) de partidas ganadas vs perdidas, según el historial de cada equipo.
+          Si los equipos tienen partidas más largas cuando pierden, puede implicar que Dire —
+          que históricamente prefiere el late-game — gana más en partidas prolongadas.
+          <strong style="color:var(--dota-gold)">Variables: duration_avg_win_r, duration_avg_lose_r (en segundos → min).</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:280px">
+          <canvas id="chartDuracion"></canvas>
+        </div>
+        <div id="duracionHallazgo" style="padding:.5rem 1.2rem 1rem;font-size:.78rem;color:var(--dota-muted)"></div>
+      </div>
+    </div>
+
+    <!-- G9: GPM por año (H1 temporal) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-graph-up-arrow" style="color:var(--dota-gold)"></i>
+            G9 — GPM por año: Ganadores vs Perdedores
+          </span>
+          <span class="badge-hip badge-h1">H1 — GPM/XPM predicen victoria</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Evolución temporal del oro por minuto (GPM) de ganadores y perdedores en 2019, 2020 y 2021.
+          Si la brecha se mantiene o crece con los años, se valida que H1 es robusta en el tiempo
+          y no solo un efecto del meta de un año específico.
+          <strong style="color:var(--dota-gold)">Variables: gold_per_min_avg_r/d agrupadas por año.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:280px">
+          <canvas id="chartGpmAnio"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- G10: Ventana histórica y win rate (H6) -->
+    <div class="col-12 col-lg-6">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-collection-fill" style="color:var(--dota-gold)"></i>
+            G10 — Ventana histórica vs Win Rate
+          </span>
+          <span class="badge-hip badge-h6">H6 — Más historial = más estable</span>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Win rate promedio del equipo Radiant agrupado por tamaño de ventana histórica (número de partidas previas).
+          Si el win rate se estabiliza con ventanas más grandes, se confirma H6:
+          tener más historial reduce la varianza de las predicciones.
+          <strong style="color:var(--dota-gold)">Variables: win_pct_r, freq_r (tamaño de ventana).</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:280px">
+          <canvas id="chartVentana"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- G11: Correlación Pearson con radiant_win (H1-H5) -->
+    <div class="col-12">
+      <div class="card-dota">
+        <div class="card-header-dota" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <span>
+            <i class="bi bi-diagram-2-fill" style="color:var(--dota-gold)"></i>
+            G11 — Correlación Pearson con victoria (Radiant)
+          </span>
+          <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+            <span class="badge-hip badge-h1">H1</span>
+            <span class="badge-hip badge-h2">H2</span>
+            <span class="badge-hip badge-h3">H3</span>
+            <span class="badge-hip badge-h4">H4</span>
+            <span class="badge-hip badge-h5">H5</span>
+          </div>
+        </div>
+        <div style="padding:.8rem 1.2rem;color:var(--dota-muted);font-size:.8rem">
+          Coeficiente de correlación de Pearson entre cada variable del equipo Radiant y el resultado (radiant_win).
+          Valores positivos = más de esa métrica → más victorias de Radiant. Valores negativos = lo opuesto.
+          Permite rankear qué hipótesis tiene el respaldo estadístico más fuerte.
+          <strong style="color:var(--dota-gold)">Variables: top 17 métricas de rendimiento del equipo Radiant.</strong>
+        </div>
+        <div style="padding:1rem;position:relative;height:420px">
+          <canvas id="chartCorr"></canvas>
+        </div>
+        <div id="corrHallazgo" style="padding:.5rem 1.2rem 1rem;font-size:.78rem;color:var(--dota-muted)"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 

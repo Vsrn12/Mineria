@@ -65,12 +65,10 @@
   \thispagestyle{empty}
   \begin{flushleft}
     Universidad La Salle\\
-    Facultad de Ingenier\'ia de Producci\'on y Servicios\\
-    Escuela Profesional de Ciencia de la Computaci\'on
   \end{flushleft}
   \vspace*{\fill}
   \begin{center}
-    {\Large\bfseries INFORME FINAL DE AN\'ALISIS EXPLORATORIO DE DATOS}\\[1.2em]
+    {\Large\bfseries INFORME DE AN\'ALISIS EXPLORATORIO DE DATOS}\\[1.2em]
     {\Large Dota 2 Pro Matches}\\[1.5em]
     {\normalsize Inteligencia de Negocios y Miner\'ia de Datos}
   \end{center}
@@ -105,17 +103,12 @@ torneos internacionales y audiencia en toda su historia. En esos a\~nos el
 juego ten\'ia una versi\'on del mapa, un pool de h\'eroes y un sistema de \'items
 cuyo meta competitivo fue ampliamente estudiado. Desde entonces, Dota~2 recibi\'o
 cambios radicales en el dise\~no del mapa, nuevos h\'eroes y reworks completos de
-mec\'anicas, por lo que la data de ese periodo ya no refleja c\'omo se juega hoy.
+mec\'anicas.
 
 La \textbf{problem\'atica principal} es que los jugadores y analistas que hoy
 buscan referencias del juego profesional de esa \'epoca ---para estudiar estrategias,
 entender el meta o prepararse para competir--- no disponen de una herramienta
-que les permita explorar esas partidas de forma estructurada. El dataset contiene
-\textbf{47\,150 partidas profesionales (2019--2021)}, pero cada fila \textbf{no}
-registra los eventos en tiempo real: almacena el \textbf{perfil hist\'orico
-promediado} de cada equipo en sus $N$ partidas previas (ventana hist\'orica),
-lo que permite analizar el rendimiento acumulado y comparar equipos de forma
-objetiva antes de que la partida comience.
+que les permita explorar esas partidas de forma estructurada.
 
 %% ============================================================
 \section{Objetivos}
@@ -488,257 +481,240 @@ para el modelo KNN fueron:
   3 & Imputaci\'on de NaN con la media columnar
     & El $\sim$6\,\% de partidas sin historial no puede descartarse;
       la media es la mejor estimaci\'on disponible \\
-  4 & Normalizaci\'on \textbf{StandardScaler} ($\mu=0,\,\sigma=1$)
-    & Las escalas son muy dispares: GPM $\approx$400 vs.\ Roshan kills $\approx$0.3 \\
-  5 & Construcci\'on de \'indice \textbf{BallTree}
+  4 & Construcci\'on de \'indice \textbf{BallTree}
     & B\'usqueda eficiente de vecinos con m\'etrica euclidiana sobre 47\,150 registros \\
-  6 & Consulta KNN con el mismo scaler
+  5 & Consulta KNN con el mismo scaler
     & Garantiza comparabilidad entre el vector de consulta y el \'indice \\
   \bottomrule
 \end{tabular}
 \end{table}
 
 %% ============================================================
-\section{Exploraci\'on}
+\section{Exploración}
 %% ============================================================
-
-Se realizaron \textbf{once gr\'aficos exploratorios} para investigar las hip\'otesis
-planteadas y describir el dataset desde m\'ultiples dimensiones: calidad de datos,
-balance de resultados, eficiencia econ\'omica, meta de h\'eroes, rendimiento de
-combate, control de visi\'on, objetivos, duraci\'on, evoluci\'on temporal y
-correlaciones con la variable objetivo. A continuaci\'on se presenta cada
-visualizaci\'on con su descripci\'on detallada y los hallazgos obtenidos.
-
+ 
+Se realizaron \textbf{once gráficos exploratorios} para investigar las hipótesis
+planteadas y describir el dataset desde múltiples dimensiones: calidad de datos,
+balance de resultados, eficiencia económica, meta de héroes, rendimiento de
+combate, control de visión, objetivos, duración, evolución temporal y
+correlaciones con la variable objetivo. A continuación se presenta cada
+visualización con su descripción detallada y los hallazgos obtenidos.
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 1 --- Distribuci\'on de partidas v\'alidas e inv\'alidas por a\~no}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.95\linewidth]{grafico1.png}
-\imagenplaceholder{Gr\'afico 1 --- grafico1.png}{Barras apiladas: partidas con h\'eroes (azul) vs.\ anomal\'ias sin historial (rojo) por a\~no (2019, 2020, 2021). Porcentaje de anomal\'ia etiquetado en rojo sobre cada barra.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras apiladas que desglosa, para
-cada a\~no del periodo analizado (2019, 2020 y 2021), la cantidad de partidas
-\textbf{v\'alidas} (aquellas que tienen al menos un h\'eroe con pick rate $>$ 0 en
+\subsection{Gráfico 1 --- Distribución de partidas válidas e inválidas por año}
+ 
+\includegraphics[width=0.95\linewidth]{grafico1.png}
+ 
+\textbf{Descripción técnica:} Gráfico de barras apiladas que desglosa, para
+cada año del periodo analizado (2019, 2020 y 2021), la cantidad de partidas
+\textbf{válidas} (aquellas que tienen al menos un héroe con pick rate $>$ 0 en
 ambos equipos, \texttt{\_has\_heroes = True}) frente a las partidas
-\textbf{an\'omalas} (\texttt{\_has\_heroes = False}). Las barras azules representan
-las partidas v\'alidas y las rojas las anomal\'ias. El porcentaje de anomal\'ia
-por a\~no se etiqueta en rojo sobre la barra correspondiente.
-
-\textbf{Metodolog\'ia:} Se calcula la columna \texttt{\_has\_heroes} como la
-intersecci\'on l\'ogica de \texttt{\_has\_heroes\_r} y \texttt{\_has\_heroes\_d},
-donde cada flag indica si al menos un h\'eroe del equipo tiene valor $>$ 0 en la
-ventana hist\'orica. Las partidas an\'omalas corresponden a equipos sin historial
+\textbf{anómalas} (\texttt{\_has\_heroes = False}). Las barras azules representan
+las partidas válidas y las rojas las anomalías. El porcentaje de anomalía
+por año se etiqueta en rojo sobre la barra correspondiente.
+ 
+\textbf{Metodología:} Se calcula la columna \texttt{\_has\_heroes} como la
+intersección lógica de \texttt{\_has\_heroes\_r} y \texttt{\_has\_heroes\_d},
+donde cada flag indica si al menos un héroe del equipo tiene valor $>$ 0 en la
+ventana histórica. Las partidas anómalas corresponden a equipos sin historial
 registrado en OpenDota (debutantes, datos faltantes en la API).
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item El total de anomal\'ias es de $\sim$2\,819 partidas, equivalente a
+  \item El total de anomalías es de $\sim$2\,819 partidas, equivalente a
         aproximadamente el \textbf{6\,\%} del dataset.
-  \item La tasa de anomal\'ia es relativamente estable entre a\~nos, lo que
-        indica que el problema de datos faltantes no se concentra en ning\'un
-        periodo espec\'ifico.
-  \item El a\~no 2020 concentra el mayor volumen absoluto de partidas (47.4\,\%
-        del total), pero no la mayor proporci\'on de anomal\'ias.
-  \item Estas anomal\'ias se excluyen del an\'alisis de h\'eroes y del modelo KNN,
-        pero se conservan para el an\'alisis de estad\'isticas globales con
-        imputaci\'on de la media.
+  \item La tasa de anomalía es relativamente estable entre años, lo que
+        indica que el problema de datos faltantes no se concentra en ningún
+        periodo específico.
+  \item El año 2020 concentra el mayor volumen absoluto de partidas (47.4\,\%
+        del total), pero no la mayor proporción de anomalías.
+  \item Estas anomalías se excluyen del análisis de héroes y del modelo KNN,
+        pero se conservan para el análisis de estadísticas globales con
+        imputación de la media.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 2 --- Win Rate global: Radiant vs.\ Dire}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.55\linewidth]{grafico2.png}
-\imagenplaceholder{Gr\'afico 2 --- grafico2.png}{Gr\'afico donut: Radiant $\approx$52.1\,\% (azul) vs.\ Dire $\approx$47.9\,\% (rojo), calculado sobre las partidas v\'alidas.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico tipo \textit{donut} (anillo) que muestra
-la distribuci\'on porcentual de victorias entre Radiant y Dire sobre las 44\,331
-partidas v\'alidas (con historial de h\'eroes). El grosor del anillo es de 0.55
-unidades. Los porcentajes se calculan directamente sobre la columna booleana
+\subsection{Gráfico 2 --- Win Rate global: Radiant vs.\ Dire}
+ 
+\includegraphics[width=0.55\linewidth]{grafico2.png}
+ 
+\textbf{Descripción técnica:} Gráfico tipo \textit{donut} (anillo) que muestra
+la distribución porcentual de victorias entre Radiant y Dire sobre las 44\,331
+partidas válidas (con historial de héroes). Los porcentajes se calculan directamente sobre la columna booleana
 \texttt{radiant\_win}.
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item \textbf{Radiant gana el 52.1\,\%} de las partidas v\'alidas y Dire
+  \item \textbf{Radiant gana el 52.1\,\%} de las partidas válidas y Dire
         el 47.9\,\%.
-  \item Esta diferencia de $\sim$4.2 puntos porcentuales es estad\'isticamente
-        significativa sobre una muestra de m\'as de 44\,000 partidas.
-  \item El sesgo de mapa es un fen\'omeno bien documentado en Dota~2 competitivo:
+  \item Esta diferencia de $\sim$4.2 puntos porcentuales es estadísticamente
+        significativa sobre una muestra de más de 44\,000 partidas.
+  \item El sesgo de mapa es un fenómeno bien documentado en Dota~2 competitivo:
         la base de Radiant se ubica en la esquina inferior izquierda, con acceso
-        m\'as directo al objetivo de Roshan y a los creeps de jungla de mayor valor.
+        más directo al objetivo de Roshan y a los creeps de jungla de mayor valor.
   \item Este desequilibrio implica que cualquier modelo predictivo debe considerar
         el equipo (Radiant vs.\ Dire) como variable relevante.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 3 --- GPM y XPM: Radiant vs.\ Dire}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico3.png}
-\imagenplaceholder{Gr\'afico 3 --- grafico3.png}{Barras agrupadas: GPM y XPM promedio global de Radiant (azul) vs.\ Dire (rojo). Valor absoluto etiquetado sobre cada barra.}
-
-\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que comparan el promedio global
+\subsection{Gráfico 3 --- GPM y XPM: Radiant vs.\ Dire}
+ 
+\includegraphics[width=0.85\linewidth]{grafico3.png}
+ 
+\textbf{Descripción técnica:} Barras agrupadas que comparan el promedio global
 de \texttt{gold\_per\_min\_avg} (GPM) y \texttt{xp\_per\_min\_avg} (XPM) entre
-Radiant y Dire calculados sobre todas las partidas v\'alidas. Cada par de barras
-representa una m\'etrica. El valor promedio se etiqueta sobre cada barra.
-
-\textbf{Metodolog\'ia:} Se calculan los promedios directamente de las columnas
+Radiant y Dire calculados sobre todas las partidas válidas. Cada par de barras
+representa una métrica. El valor promedio se etiqueta sobre cada barra.
+ 
+\textbf{Metodología:} Se calculan los promedios directamente de las columnas
 \texttt{gold\_per\_min\_avg\_r}, \texttt{gold\_per\_min\_avg\_d},
 \texttt{xp\_per\_min\_avg\_r} y \texttt{xp\_per\_min\_avg\_d} del subconjunto
 \texttt{df\_valid}.
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
   \item Radiant presenta un GPM ligeramente superior al de Dire, consistente con
-        su mayor tasa de victorias (los equipos ganadores acumulan m\'as oro).
-  \item El XPM sigue el mismo patr\'on: mayor para Radiant en promedio.
-  \item La diferencia en GPM y XPM es peque\~na en t\'erminos absolutos cuando
+        su mayor tasa de victorias (los equipos ganadores acumulan más oro).
+  \item El XPM sigue el mismo patrón: mayor para Radiant en promedio.
+  \item La diferencia en GPM y XPM es pequeña en términos absolutos cuando
         se promedia sobre todo el dataset, porque el resultado de la partida
-        no est\'a controlado --- ambos equipos aparecen como ganadores y
+        no está controlado --- ambos equipos aparecen como ganadores y
         perdedores en diferentes filas.
-  \item Esto refuerza la hip\'otesis 1: la ventaja econ\'omica de Radiant no es
-        solo estructural de mapa, sino que se refleja en las m\'etricas
-        hist\'oricas de eficiencia.
+  \item Esto refuerza la hipótesis 1: la ventaja económica de Radiant no es
+        solo estructural de mapa, sino que se refleja en las métricas
+        históricas de eficiencia.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 4 --- Win Rate de los Top 50 H\'eroes m\'as elegidos}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.95\linewidth]{grafico4.png}
-\imagenplaceholder{Gr\'afico 4 --- grafico4.png}{Barras verticales: win rate (\%) de los 50 h\'eroes con mayor frecuencia de pick, ordenados de mayor a menor win rate. Verde $\geq$55\,\%, rojo $\leq$45\,\%, dorado = rango neutro.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico de 50 barras verticales que muestra el
-win rate individual de cada uno de los 50 h\'eroes m\'as utilizados en el dataset.
-La \textbf{frecuencia} de un h\'eroe se calcula como la \textbf{suma acumulada de
+\subsection{Gráfico 4 --- Win Rate de los Top 50 Héroes más elegidos}
+ 
+\includegraphics[width=0.95\linewidth]{grafico4.png}
+ 
+\textbf{Descripción técnica:} Gráfico de 50 barras verticales que muestra el
+win rate individual de cada uno de los 50 héroes más utilizados en el dataset.
+La \textbf{frecuencia} de un héroe se calcula como la \textbf{suma acumulada de
 sus pick rates} (no como conteo de partidas), lo que pondera habilidades elegidas
 consistentemente sobre muchas partidas. Las barras se ordenan de mayor a menor win
-rate para una lectura fluida, y se colorean seg\'un tres umbrales: verde
-($\geq$55\,\%), rojo ($\leq$45\,\%) y dorado (rango intermedio). L\'ineas de
+rate para una lectura fluida, y se colorean según tres umbrales: verde
+($\geq$55\,\%), rojo ($\leq$45\,\%) y dorado (rango intermedio). Líneas de
 referencia horizontales a 45\,\%, 50\,\% y 55\,\%.
-
-\textbf{Metodolog\'ia:}
+ 
+\textbf{Metodología:}
 \begin{enumerate}
-  \item Para cada h\'eroe $h$, se suma \texttt{hero\_h\_avg\_r.fillna(0)} sobre
+  \item Para cada héroe $h$, se suma \texttt{hero\_h\_avg\_r.fillna(0)} sobre
         todas las filas ($\text{freq\_r}$) y equivalente para Dire.
-  \item Las victorias se cuentan: si Radiant tiene el h\'eroe y gan\'o
-        (\texttt{radiant\_win = True}) suma como victoria; si est\'a en Dire y
-        perdi\'o Radiant (\texttt{radiant\_win = False}), tambi\'en.
+  \item Las victorias se cuentan: si Radiant tiene el héroe y ganó
+        (\texttt{radiant\_win = True}) suma como victoria; si está en Dire y
+        perdió Radiant (\texttt{radiant\_win = False}), también.
   \item $\text{WR}(h) = \text{wins}(h) / \text{partidas}(h) \times 100$.
-  \item Solo se incluyen h\'eroes con $\geq$50 partidas de aparici\'on.
+  \item Solo se incluyen héroes con $\geq$50 partidas de aparición.
 \end{enumerate}
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
   \item Existe un rango relativamente estrecho de win rates (aproximadamente
-        43--57\,\%) en el \'ambito profesional, lo que indica que el balance del
+        43--57\,\%) en el ámbito profesional, lo que indica que el balance del
         meta es alto.
-  \item Los h\'eroes con win rate $\geq$55\,\% son los considerados ``meta'' o
+  \item Los héroes con win rate $\geq$55\,\% son los considerados ``meta'' o
         sobrevaluados en el parche analizado.
-  \item Los h\'eroes con win rate $\leq$45\,\% son frecuentes a pesar de su baja
-        efectividad, lo que sugiere que su uso responde a estrategias espec\'ificas
+  \item Los héroes con win rate $\leq$45\,\% son frecuentes a pesar de su baja
+        efectividad, lo que sugiere que su uso responde a estrategias específicas
         o al drafting del equipo contrario.
-  \item La metodolog\'ia de suma de pick rates (en lugar de conteo de filas)
-        garantiza que el ranking sea id\'entico al de la aplicaci\'on web, donde
-        un h\'eroe elegido con alta tasa en pocas partidas pesa m\'as que uno
+  \item La metodología de suma de pick rates (en lugar de conteo de filas)
+        garantiza que el ranking sea idéntico al de la aplicación web, donde
+        un héroe elegido con alta tasa en pocas partidas pesa más que uno
         elegido puntualmente en muchas.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 5 --- KDA: ganadores vs.\ perdedores}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico5.png}
-\imagenplaceholder{Gr\'afico 5 --- grafico5.png}{Histograma de densidad superpuesto: KDA hist\'orico de equipos ganadores (verde) vs.\ perdedores (rojo), con l\'ineas verticales de media. Rango del eje X: 0.5 -- 8.}
-
-\textbf{Descripci\'on t\'ecnica:} Histograma de densidad superpuesto que compara
-la distribuci\'on del KDA hist\'orico (\texttt{kda\_avg}) entre los equipos que
-ganaron y los que perdieron en cada partida. Para cada partida v\'alida, el equipo
+\subsection{Gráfico 5 --- KDA: ganadores vs.\ perdedores}
+ 
+\includegraphics[width=0.85\linewidth]{grafico5.png}
+ 
+\textbf{Descripción técnica:} Histograma de densidad superpuesto que compara
+la distribución del KDA histórico (\texttt{kda\_avg}) entre los equipos que
+ganaron y los que perdieron en cada partida. Para cada partida válida, el equipo
 ganador es Radiant cuando \texttt{radiant\_win = True}, o Dire en caso contrario.
 Los valores se recortan al rango $[0.5,\, 8]$ para eliminar outliers extremos.
-Las l\'ineas verticales punteadas indican la media de cada distribuci\'on.
-
-\textbf{Metodolog\'ia:} Se extraen los KDA de ganadores concatenando
+Las líneas verticales punteadas indican la media de cada distribución.
+ 
+\textbf{Metodología:} Se extraen los KDA de ganadores concatenando
 \texttt{kda\_avg\_r} (cuando Radiant gana) con \texttt{kda\_avg\_d} (cuando Dire
-gana), y an\'alogamente para perdedores. Se usa la funci\'on de densidad (no
-frecuencia absoluta) para hacer comparables distribuciones de tama\~nos similares.
-
+gana), y análogamente para perdedores. Se usa la función de densidad (no
+frecuencia absoluta) para hacer comparables distribuciones de tamaños similares.
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item Los equipos \textbf{ganadores} presentan una distribuci\'on de KDA
+  \item Los equipos \textbf{ganadores} presentan una distribución de KDA
         desplazada hacia la derecha respecto a los perdedores, con media
         significativamente mayor.
-  \item La superposici\'on de distribuciones indica que el KDA no es un predictor
+  \item La superposición de distribuciones indica que el KDA no es un predictor
         perfecto: un equipo puede ganar con KDA bajo (por objetivos, no por
         combate) o perder con KDA alto (si cede torres).
-  \item Apoya la hip\'otesis 2: mayor KDA hist\'orico se asocia con mayor
+  \item Apoya la hipótesis 2: mayor KDA histórico se asocia con mayor
         probabilidad de victoria, aunque no de forma determinista.
-  \item La cola derecha de los ganadores es m\'as larga, indicando que los equipos
+  \item La cola derecha de los ganadores es más larga, indicando que los equipos
         con rendimiento excepcional de combate casi siempre ganan.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 6 --- Control de visi\'on: wards colocadas y destruidas}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico6.png}
-\imagenplaceholder{Gr\'afico 6 --- grafico6.png}{Barras agrupadas: 4 m\'etricas de visi\'on (observer colocadas, observer destruidas, sentry colocadas, sentry destruidas) comparadas entre ganadores (verde) y perdedores (rojo). Valor promedio etiquetado sobre cada barra.}
-
-\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que comparan cuatro m\'etricas
-de control de visi\'on entre equipos ganadores y perdedores: wards
+\subsection{Gráfico 6 --- Control de visión: wards colocadas y destruidas}
+ 
+\includegraphics[width=0.85\linewidth]{grafico6.png}
+ 
+\textbf{Descripción técnica:} Barras agrupadas que comparan cuatro métricas
+de control de visión entre equipos ganadores y perdedores: wards
 \textbf{observer} colocadas (\texttt{observer\_uses\_avg}), wards observer
 \textbf{destruidas} (\texttt{observer\_kills\_avg}), wards \textbf{sentry}
 colocadas (\texttt{sentry\_uses\_avg}) y wards sentry \textbf{destruidas}
 (\texttt{sentry\_kills\_avg}). Cada par de barras agrupa ganador (verde) vs.\
-perdedor (rojo) por m\'etrica.
-
-\textbf{Metodolog\'ia:} Se utiliza la funci\'on \texttt{split\_win\_lose(col\_r,
+perdedor (rojo) por métrica.
+ 
+\textbf{Metodología:} Se utiliza la función \texttt{split\_win\_lose(col\_r,
 col\_d)} que separa los valores por resultado, concatenando el equipo correcto
-(Radiant o Dire) seg\'un \texttt{radiant\_win}. Los promedios se calculan sobre
-todas las partidas v\'alidas.
-
+(Radiant o Dire) según \texttt{radiant\_win}. Los promedios se calculan sobre
+todas las partidas válidas.
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item Los equipos ganadores colocan \textbf{m\'as} wards observer y sentry
-        que los perdedores, indicando mayor inversi\'on en informaci\'on.
-  \item Los ganadores tambi\'en \textbf{destruyen m\'as} wards enemigas,
-        lo que se conoce como ``desvisi\'on'' activa.
-  \item La diferencia es m\'as pronunciada en observer kills que en sentry kills,
-        sugiriendo que negar la visi\'on pasiva del enemigo es m\'as diferenciador.
-  \item Apoya la hip\'otesis 3: la guerra de visi\'on es un diferenciador
-        estad\'isticamente real en el circuito profesional.
-  \item Equipos con mejor visi\'on toman mejores decisiones de mapa (ganks,
+  \item Los equipos ganadores colocan \textbf{más} wards observer y sentry
+        que los perdedores, indicando mayor inversión en información.
+  \item Los ganadores también \textbf{destruyen más} wards enemigas,
+        lo que se conoce como ``desvisión'' activa.
+  \item La diferencia es más pronunciada en observer kills que en sentry kills,
+        sugiriendo que negar la visión pasiva del enemigo es más diferenciador.
+  \item Apoya la hipótesis 3: la guerra de visión es un diferenciador
+        estadísticamente real en el circuito profesional.
+  \item Equipos con mejor visión toman mejores decisiones de mapa (ganks,
         rotaciones, objetivos), lo que se traduce directamente en ventaja de
         recursos.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 7 --- Torres vs.\ Kills: ¿qu\'e predice mejor la victoria?}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico7.png}
-\imagenplaceholder{Gr\'afico 7 --- grafico7.png}{Barras horizontales: diferencia relativa ganador $-$ perdedor (\%) para 5 objetivos (torres destruidas, kills de h\'eroes, da\~no a torres, kills de Roshan, kills de neutrales). Verde = ventaja positiva.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras horizontales que cuantifica
+\subsection{Gráfico 7 --- Torres vs.\ Kills: ¿qué predice mejor la victoria?}
+ 
+\includegraphics[width=0.85\linewidth]{grafico7.png}
+ 
+\textbf{Descripción técnica:} Gráfico de barras horizontales que cuantifica
 la \textbf{diferencia relativa} entre ganadores y perdedores para cinco tipos de
-objetivos: torres destruidas (\texttt{tower\_kills\_avg}), kills de h\'eroes
-(\texttt{hero\_kills\_avg}), da\~no a torres (\texttt{tower\_damage\_avg}), kills
+objetivos: torres destruidas (\texttt{tower\_kills\_avg}), kills de héroes
+(\texttt{hero\_kills\_avg}), daño a torres (\texttt{tower\_damage\_avg}), kills
 de Roshan (\texttt{roshan\_kills\_avg}) y kills de neutrales
 (\texttt{neutral\_kills\_avg}). La diferencia relativa se calcula como:
-
+ 
 $$\Delta_{\%}(m) = \frac{\bar{m}_\text{ganador} - \bar{m}_\text{perdedor}}{\bar{m}_\text{perdedor}} \times 100$$
-
+ 
 Las barras verdes indican que el ganador supera al perdedor. El valor se etiqueta
 al extremo de cada barra.
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
   \item \textbf{Las torres destruidas} presentan la mayor diferencia relativa
-        entre ganadores y perdedores, confirmando la hip\'otesis 5: las torres
-        son el predictor m\'as fuerte del resultado.
-  \item El \textbf{da\~no a torres} es el segundo diferenciador m\'as grande,
+        entre ganadores y perdedores, confirmando la hipótesis 5: las torres
+        son el predictor más fuerte del resultado.
+  \item El \textbf{daño a torres} es el segundo diferenciador más grande,
         lo que indica que el trabajo de siegeo (asedio a estructuras) es clave.
-  \item Las \textbf{kills de h\'eroes} tienen una diferencia positiva pero menor,
+  \item Las \textbf{kills de héroes} tienen una diferencia positiva pero menor,
         lo que sugiere que ganar combates no garantiza la victoria si no se
         traduce en objetivos estructurales.
   \item Los \textbf{kills de Roshan} muestran cierta diferencia, pero son
@@ -747,142 +723,134 @@ al extremo de cada barra.
         ambos equipos farman la jungla de manera similar independientemente del
         resultado.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 8 --- Duraci\'on de partidas: ganando vs.\ perdiendo}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.95\linewidth]{grafico8.png}
-\imagenplaceholder{Gr\'afico 8 --- grafico8.png}{Panel izquierdo: histograma de densidad superpuesto de duraci\'on en victorias (verde) vs.\ derrotas (rojo) para Radiant, con l\'ineas de media. Panel derecho: boxplot comparativo de ambas distribuciones.}
-
-\textbf{Descripci\'on t\'ecnica:} Figura de dos paneles. El panel izquierdo es un
-histograma de densidad superpuesto que compara la distribuci\'on de
-\texttt{duration\_avg\_win\_r} (duraci\'on promedio hist\'orica en victorias de
+\subsection{Gráfico 8 --- Duración de partidas: ganando vs.\ perdiendo}
+ 
+\includegraphics[width=0.95\linewidth]{grafico8.png}
+ 
+\textbf{Descripción técnica:} Figura de dos paneles. El panel izquierdo es un
+histograma de densidad superpuesto que compara la distribución de
+\texttt{duration\_avg\_win\_r} (duración promedio histórica en victorias de
 Radiant) contra \texttt{duration\_avg\_lose\_r} (en derrotas). El panel derecho
-presenta un boxplot comparativo entre ambas distribuciones. Los valores est\'an
-en minutos (la columna original est\'a en segundos y se divide entre 60).
-
+presenta un boxplot comparativo entre ambas distribuciones. Los valores están
+en minutos (la columna original está en segundos y se divide entre 60).
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item Los equipos de Radiant tienen una duraci\'on promedio de victoria
-        \textbf{menor} que su duraci\'on promedio de derrota.
+  \item Los equipos de Radiant tienen una duración promedio de victoria
+        \textbf{menor} que su duración promedio de derrota.
   \item Esto confirma un principio conocido en Dota~2: los equipos \textbf{ganan
-        m\'as r\'apido} de lo que pierden, porque el equipo ganador ejecuta la
+        más rápido} de lo que pierden, porque el equipo ganador ejecuta la
         victoria cuando tiene ventaja, mientras que el equipo perdedor alarga el
         juego buscando una remontada (\textit{comeback}).
   \item El boxplot muestra mayor varianza en las derrotas, lo que indica que la
-        duraci\'on de los juegos perdidos es m\'as impredecible.
+        duración de los juegos perdidos es más impredecible.
   \item Partidas muy largas ($>$50 min) suelen corresponder a derrotas o a
-        partidas muy parejas donde la ventaja se escap\'o.
-  \item Relevante para la hip\'otesis 4: en partidas largas, Roshan se mata
-        m\'as veces y su impacto relativo aumenta.
+        partidas muy parejas donde la ventaja se escapó.
+  \item Relevante para la hipótesis 4: en partidas largas, Roshan se mata
+        más veces y su impacto relativo aumenta.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 9 --- GPM por a\~no: ganadores vs.\ perdedores}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico9.png}
-\imagenplaceholder{Gr\'afico 9 --- grafico9.png}{Barras agrupadas por a\~no (2019, 2020, 2021): GPM promedio de ganadores (verde) vs.\ perdedores (rojo). Valor absoluto etiquetado sobre cada barra.}
-
-\textbf{Descripci\'on t\'ecnica:} Barras agrupadas que muestran, para cada a\~no
+\subsection{Gráfico 9 --- GPM por año: ganadores vs.\ perdedores}
+ 
+\includegraphics[width=0.85\linewidth]{grafico9.png}
+ 
+\textbf{Descripción técnica:} Barras agrupadas que muestran, para cada año
 del periodo analizado (2019, 2020, 2021), el GPM (\texttt{gold\_per\_min\_avg})
-promedio de los equipos ganadores frente a los perdedores. El an\'alisis se
-realiza sobre el subconjunto de partidas v\'alidas de cada a\~no. Cada par de
-barras representa un a\~no, con barra verde para ganadores y roja para perdedores.
-
-\textbf{Metodolog\'ia:} Se filtra \texttt{df\_valid} por \texttt{\_year} y se
+promedio de los equipos ganadores frente a los perdedores. El análisis se
+realiza sobre el subconjunto de partidas válidas de cada año. Cada par de
+barras representa un año, con barra verde para ganadores y roja para perdedores.
+ 
+\textbf{Metodología:} Se filtra \texttt{df\_valid} por \texttt{\_year} y se
 separan los GPM de ganadores y perdedores usando \texttt{split\_win\_lose} por
-a\~no, concatenando Radiant (cuando \texttt{radiant\_win = True}) y Dire (cuando
+año, concatenando Radiant (cuando \texttt{radiant\_win = True}) y Dire (cuando
 \texttt{radiant\_win = False}).
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
   \item La brecha de GPM entre ganadores y perdedores se mantiene
-        \textbf{consistente en los tres a\~nos}, lo que confirma que la eficiencia
-        econ\'omica es un predictor estable del resultado a lo largo del tiempo.
-  \item El GPM promedio general aument\'o entre 2019 y 2021, reflejando la
-        evoluci\'on del meta profesional hacia juegos con mayor ritmo de farm.
+        \textbf{consistente en los tres años}, lo que confirma que la eficiencia
+        económica es un predictor estable del resultado a lo largo del tiempo.
+  \item El GPM promedio general aumentó entre 2019 y 2021, reflejando la
+        evolución del meta profesional hacia juegos con mayor ritmo de farm.
   \item La diferencia absoluta entre ganadores y perdedores es de
-        aproximadamente 30--50 GPM en todos los a\~nos.
-  \item Esto valida la hip\'otesis 1 de forma temporal: la eficiencia econ\'omica
-        no es un artefacto de un parche espec\'ifico, sino una constante
+        aproximadamente 30--50 GPM en todos los años.
+  \item Esto valida la hipótesis 1 de forma temporal: la eficiencia económica
+        no es un artefacto de un parche específico, sino una constante
         estructural del juego profesional.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 10 --- Tama\~no de ventana hist\'orica y estabilidad del win rate}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.85\linewidth]{grafico10.png}
-\imagenplaceholder{Gr\'afico 10 --- grafico10.png}{Barras (eje izquierdo, cian): win rate promedio (\%) por bucket de ventana hist\'orica con barras de error (desv.\ est.). L\'inea superpuesta (eje derecho, dorado): N\'umero de partidas por bucket. Buckets: 1--10, 11--30, 31--60, 61--100, 101--200, 201+.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico combinado con doble eje Y. El eje
+\subsection{Gráfico 10 --- Tamaño de ventana histórica y estabilidad del win rate}
+ 
+\includegraphics[width=0.85\linewidth]{grafico10.png}
+ 
+\textbf{Descripción técnica:} Gráfico combinado con doble eje Y. El eje
 izquierdo (barras cianas) muestra el win rate promedio (\texttt{win\_pct\_r})
-por tramo de tama\~no de ventana hist\'orica (\texttt{freq\_r}), agrupado en
+por tramo de tamaño de ventana histórica (\texttt{freq\_r}), agrupado en
 6 buckets: 1--10, 11--30, 31--60, 61--100, 101--200 y 201+. Las barras de error
-representan la desviaci\'on est\'andar del win rate dentro de cada bucket. El eje
-derecho (l\'inea dorada) muestra el n\'umero de partidas en cada bucket.
-
+representan la desviación estándar del win rate dentro de cada bucket. El eje
+derecho (línea dorada) muestra el número de partidas en cada bucket.
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item Los equipos con \textbf{ventana hist\'orica peque\~na} (1--10 partidas)
-        presentan una \textbf{mayor desviaci\'on est\'andar} en su win rate,
-        lo que indica que sus estad\'isticas son menos representativas.
-  \item A medida que aumenta \texttt{freq\_r}, la desviaci\'on est\'andar del
-        win rate se reduce: con m\'as historial, las m\'etricas convergen a
-        valores m\'as confiables.
-  \item El bucket 201+ tiene el menor error, aunque tambi\'en el menor n\'umero
+  \item Los equipos con \textbf{ventana histórica pequeña} (1--10 partidas)
+        presentan una \textbf{mayor desviación estándar} en su win rate,
+        lo que indica que sus estadísticas son menos representativas.
+  \item A medida que aumenta \texttt{freq\_r}, la desviación estándar del
+        win rate se reduce: con más historial, las métricas convergen a
+        valores más confiables.
+  \item El bucket 201+ tiene el menor error, aunque también el menor número
         de partidas (equipos muy activos).
   \item Este hallazgo justifica el uso de la media columnar para imputar valores
-        faltantes: los equipos sin historial ser\'an asignados al promedio global,
-        que es la mejor estimaci\'on disponible.
+        faltantes: los equipos sin historial serán asignados al promedio global,
+        que es la mejor estimación disponible.
   \item Es relevante para el modelo KNN: distancias calculadas sobre equipos con
         poca historia son menos confiables que las de equipos con $>$60 partidas
-        hist\'oricas.
+        históricas.
 \end{itemize}
-
+ 
 % ------------------------------------------------------------------
-\subsection{Gr\'afico 11 --- Correlaci\'on de estad\'isticas con la victoria}
-
-% Para insertar la imagen real, reemplazar el bloque siguiente por:
-% \includegraphics[width=0.95\linewidth]{grafico11.png}
-\imagenplaceholder{Gr\'afico 11 --- grafico11.png}{Barras horizontales: correlaci\'on de Pearson de 17 estad\'isticas de Radiant con \texttt{radiant\_win}, ordenadas de mayor a menor. Verde = correlaci\'on positiva, rojo = negativa.}
-
-\textbf{Descripci\'on t\'ecnica:} Gr\'afico de barras horizontales que muestra el
-\textbf{coeficiente de correlaci\'on de Pearson} entre 17 estad\'isticas
+\subsection{Gráfico 11 --- Correlación de estadísticas con la victoria}
+ 
+\includegraphics[width=0.95\linewidth]{grafico11.png}
+ 
+\textbf{Descripción técnica:} Gráfico de barras horizontales que muestra el
+\textbf{coeficiente de correlación de Pearson} entre 17 estadísticas
 seleccionadas de Radiant y la variable objetivo \texttt{radiant\_win}. Las
-estad\'isticas incluyen: \texttt{win\_pct}, \texttt{kda\_avg},
+estadísticas incluyen: \texttt{win\_pct}, \texttt{kda\_avg},
 \texttt{gold\_per\_min\_avg}, \texttt{xp\_per\_min\_avg}, \texttt{hero\_kills\_avg},
 \texttt{deaths\_avg}, \texttt{assists\_avg}, \texttt{tower\_kills\_avg},
 \texttt{tower\_damage\_avg}, \texttt{roshan\_kills\_avg},
 \texttt{observer\_uses\_avg}, \texttt{sentry\_uses\_avg}, \texttt{last\_hits\_avg},
 \texttt{denies\_avg}, \texttt{neutral\_kills\_avg},
 \texttt{firstblood\_claimed\_avg} y \texttt{buyback\_count\_avg}. Las barras se
-colorean en verde si la correlaci\'on es positiva y en rojo si es negativa, y se
-ordenan de mayor a menor correlaci\'on.
-
-\textbf{Metodolog\'ia:} Se calcula la matriz de correlaci\'on de Pearson sobre
-\texttt{df\_valid} para las 17 features seleccionadas m\'as \texttt{radiant\_win},
+colorean en verde si la correlación es positiva y en rojo si es negativa, y se
+ordenan de mayor a menor correlación.
+ 
+\textbf{Metodología:} Se calcula la matriz de correlación de Pearson sobre
+\texttt{df\_valid} para las 17 features seleccionadas más \texttt{radiant\_win},
 y se extrae la columna correspondiente a \texttt{radiant\_win}.
-
+ 
 \textbf{Hallazgos:}
 \begin{itemize}
-  \item \texttt{win\_pct\_r} tiene la \textbf{correlaci\'on m\'as alta} con
-        \texttt{radiant\_win}, lo que es esperado: la tasa de victorias hist\'orica
+  \item \texttt{win\_pct\_r} tiene la \textbf{correlación más alta} con
+        \texttt{radiant\_win}, lo que es esperado: la tasa de victorias histórica
         predice victorias futuras.
   \item \texttt{kda\_avg\_r}, \texttt{gold\_per\_min\_avg\_r} y
         \texttt{xp\_per\_min\_avg\_r} tienen correlaciones positivas moderadas,
-        confirmando las hip\'otesis 1 y 2.
-  \item \texttt{deaths\_avg\_r} tiene la \textbf{correlaci\'on negativa m\'as
-        fuerte}: m\'as muertes hist\'oricas predicen menor probabilidad de ganar.
-  \item \texttt{tower\_kills\_avg\_r} tiene mayor correlaci\'on que
-        \texttt{hero\_kills\_avg\_r}, apoyando la hip\'otesis 5.
+        confirmando las hipótesis 1 y 2.
+  \item \texttt{deaths\_avg\_r} tiene la \textbf{correlación negativa más
+        fuerte}: más muertes históricas predicen menor probabilidad de ganar.
+  \item \texttt{tower\_kills\_avg\_r} tiene mayor correlación que
+        \texttt{hero\_kills\_avg\_r}, apoyando la hipótesis 5.
   \item Variables como \texttt{buyback\_count\_avg\_r} tienen correlaciones
-        pr\'acticamente nulas, lo que indica que el uso de buybacks no discrimina
+        prácticamente nulas, lo que indica que el uso de buybacks no discrimina
         ganadores de perdedores.
-  \item Este gr\'afico sirve como \textbf{mapa de importancia de variables} para
-        orientar futuros modelos de clasificaci\'on supervisados sobre este dataset.
+  \item Este gráfico sirve como \textbf{mapa de importancia de variables} para
+        orientar futuros modelos de clasificación supervisados sobre este dataset.
 \end{itemize}
 
 %% ============================================================
@@ -960,6 +928,55 @@ defensivas.
         (regresi\'on log\'istica, Random Forest, XGBoost).
 \end{itemize}
 
+\subsection*{Desaf\'ios encontrados y sorpresas}
+
+\textbf{Desaf\'ios:}
+\begin{itemize}
+  \item \textbf{Datos faltantes por dise\~no:} el 6\,\% de las partidas no ten\'ia
+        hist\'orico de h\'eroes registrado. Esto no fue un error del CSV, sino
+        una consecuencia real de la API: equipos debutantes, partidas jugadas
+        simult\'aneamente que comparten estad\'isticas, y abandonos tempranos.
+        El reto fue distinguir entre ``dato ausente por error'' y ``dato ausente
+        porque la informaci\'on nunca existi\'o'', y decidir que la imputaci\'on
+        con la media era preferible a descartar esas filas por completo.
+  \item \textbf{Consistencia entre herramientas:} se detect\'o una discrepancia
+        entre el ranking de h\'eroes calculado en el cuaderno de an\'alisis y el
+        que mostraba la aplicaci\'on web. La causa fue sutil: el cuaderno contaba
+        \textit{filas} donde aparec\'ia un h\'eroe, mientras que el \textit{backend}
+        sumaba los \textit{valores num\'ericos} del pick rate. Unificar ambos
+        c\'alculos requiri\'o revisar la l\'ogica completa del \textit{pipeline}.
+  \item \textbf{Alta dimensionalidad:} el dataset tiene 242 columnas de
+        pick rate de h\'eroes. Incluirlas todas en el modelo KNN degrada la
+        m\'etrica de distancia (el llamado ``curse of dimensionality''), por lo
+        que fue necesario seleccionar solo las 66 columnas de estad\'isticas
+        de rendimiento m\'as relevantes.
+\end{itemize}
+
+\textbf{Sorpresas encontradas durante el an\'alisis:}
+\begin{itemize}
+  \item \textbf{La ventaja de Radiant es real y estable.} Se sab\'ia de
+        antemano que exist\'ia cierto sesgo de mapa, pero encontrar que ese
+        desequilibrio se manten\'ia en exactamente el 52.1\,\% de forma
+        constante en los tres a\~nos fue notable. En 47\,150 partidas, una
+        diferencia de 4 puntos porcentuales es estad\'isticamente robusta.
+  \item \textbf{Las torres predicen mejor que los kills.} La hip\'otesis de
+        que destruir torres es m\'as determinante que ganar combates se
+        confirm\'o con una diferencia relativa del $>$50\,\% en torres frente
+        al $\sim$25\,\% en kills. En un juego donde los combates son
+        espect\'aculares y visibles, resultaba contraintuitivo que el ``aburrido''
+        trabajo de asedio sea el verdadero predictor del resultado.
+  \item \textbf{El GPM aument\'o entre 2019 y 2021.} Al analizar el GPM por
+        a\~no (Gr\'afico 9) se observ\'o que el ritmo de generaci\'on de oro
+        aument\'o progresivamente. Esto refleja una tendencia documentada del
+        meta profesional de Dota~2 hacia estrategias de farm acelerado.
+  \item \textbf{Roshan tiene un impacto m\'as d\'ebil de lo esperado.}
+        Roshan es el enemigo neutro m\'as ic\'onico del juego y su muerte es
+        un evento categ\'orico en toda partida. Sin embargo, su correlaci\'on
+        con la victoria fue la m\'as baja entre los objetivos, probablemente
+        porque ambos equipos matan a Roshan a lo largo de la partida y el
+        impacto de un kill individual se diluye en el promedio hist\'orico.
+\end{itemize}
+
 \subsection*{Conclusi\'on general}
 
 \begin{itemize}
@@ -978,6 +995,170 @@ defensivas.
         el an\'alisis de esports competitivos, extensible a modelos predictivos
         de mayor complejidad.
 \end{itemize}
+
+\newpage
+\section{Glosario de T\'erminos}
+
+\textit{Esta secci\'on explica los t\'erminos del videojuego y del an\'alisis
+de datos utilizados en el informe, pensada para el lector que no est\'a
+familiarizado con Dota~2 ni con la miner\'ia de datos.}
+
+\subsection*{T\'erminos de Dota 2}
+
+\begin{description}[leftmargin=3.8cm, style=nextline, itemsep=5pt]
+
+  \item[Dota 2 (MOBA)] Videojuego de estrategia en tiempo real de Valve
+    Corporation. ``MOBA'' significa \textit{Multiplayer Online Battle Arena}:
+    dos equipos de 5 jugadores se enfrentan en un mapa con el \'unico objetivo
+    de destruir la base central del rival.
+
+  \item[Radiant y Dire] Los nombres de los dos bandos en cada partida.
+    Radiant ocupa la esquina inferior izquierda del mapa y Dire la superior
+    derecha. En cada partida profesional se sortea qu\'e equipo juega cada bando.
+
+  \item[Ancient] La estructura central de la base de cada equipo.
+    Destruir el Ancient rival es la condici\'on de victoria. Es equivalente
+    al ``Nexo'' en League of Legends o al ``cuartel general'' en los juegos
+    de estrategia cl\'asicos.
+
+  \item[H\'eroe] El personaje controlado por cada jugador. Hay m\'as de
+    120 h\'eroes disponibles, cada uno con habilidades \'unicas. Los equipos
+    eligen sus h\'eroes antes de empezar y no pueden repetir el mismo h\'eroe
+    en una partida.
+
+  \item[Draft / Drafting] El proceso de selecci\'on y veto de h\'eroes antes
+    de cada partida, equivalente a las rotaciones de jugadores en deportes
+    convencionales. Cada equipo elige su estrategia seleccionando h\'eroes
+    y bloqueando los del rival.
+
+  \item[Roshan] El enemigo neutral m\'as poderoso del mapa, ubicado en una
+    cueva al centro. Matarlo otorga al equipo el \textbf{Aegis of the Immortal}
+    (que permite resucitar gratis una vez) y una gran recompensa de oro y
+    experiencia. Es el objetivo secundario m\'as relevante del juego.
+
+  \item[Torres (Towers)] Estructuras defensivas que protegen el camino hacia el
+    Ancient. Hay varias torres por cada uno de los tres carriles del mapa y
+    el equipo atacante debe destruirlas en orden para llegar a la base rival.
+
+  \item[Ward (Observer / Sentry)] Dispositivos de visi\'on que se colocan en
+    puntos estrat\'egicos del mapa. La \textbf{Observer ward} otorga visi\'on
+    pasiva de un \'area; la \textbf{Sentry ward} revela unidades invisibles y
+    wards enemigas ocultas. Controlar la visi\'on del mapa permite planear
+    emboscadas y tomar objetivos sin ser sorprendido.
+
+  \item[GPM (Gold Per Minute)] Oro ganado por el equipo por minuto de juego.
+    Con el oro se compran \textit{items} (equipamiento) que hacen al h\'eroe
+    m\'as poderoso. Un GPM alto significa que el equipo est\'a generando recursos
+    de forma eficiente.
+
+  \item[XPM (Experience Per Minute)] Experiencia ganada por el equipo por
+    minuto. La experiencia aumenta el nivel del h\'eroe, lo que desbloquea
+    habilidades m\'as poderosas. Un XPM alto indica que el equipo crece m\'as
+    r\'apido que el rival.
+
+  \item[KDA (Kills / Deaths / Assists)] M\'etrica sint\'etica de rendimiento de
+    combate: (Kills + Asistencias) $\div$ Muertes propias. Un KDA de 3.0 significa
+    que por cada muerte propia el equipo obtuvo 3 eliminaciones. KDA alto indica
+    dominancia en los enfrentamientos directos.
+
+  \item[Farm / Farmear] La acci\'on de matar creeps y neutrales para acumular
+    oro y experiencia de forma eficiente, sin necesariamente buscar el combate
+    contra los h\'eroes rivales.
+
+  \item[Gank] Emboscada coordinada a uno o m\'as h\'eroes rivales en una posici\'on
+    donde no esperan ser atacados. Requiere visi\'on del mapa para ejecutarse
+    con seguridad.
+
+  \item[Last Hit / Deny] Mec\'anica exclusiva de Dota~2. El oro de un creep solo
+    se obtiene si el jugador da el \textbf{\'ultimo golpe} (last hit). Adem\'as,
+    se puede ``denegar'' (deny) un creep aliado para evitar que el rival
+    reciba el oro cuando lo mate.
+
+  \item[Creeps / Minions] Tropas autom\'aticas que aparecen cada 30 segundos y
+    caminan hacia la base rival. Son la principal fuente de oro y experiencia
+    durante los primeros minutos.
+
+  \item[Buyback] Opci\'on de gastar oro para resucitar inmediatamente en lugar de
+    esperar. Se usa en momentos cr\'iticos para defender ante un ataque inesperado.
+
+  \item[First Blood] La primera eliminaci\'on de h\'eroe de la partida. Otorga
+    una recompensa de oro extra y suele indicar qui\'en lleva la ventaja inicial.
+
+  \item[Meta] Del ingl\'es \textit{Most Effective Tactics Available}: el conjunto
+    de estrategias, h\'eroes e \'items considerados \'optimos en un parche
+    espec\'ifico. El meta cambia con cada actualizaci\'on del juego.
+
+  \item[Parche (Patch)] Actualizaci\'on del juego publicada por Valve que puede
+    cambiar las estad\'isticas de h\'eroes, el mapa o las mec\'anicas, alterando
+    radicalmente el meta competitivo.
+
+  \item[Siegeo / Siege] Estrategia de asedio sistem\'atico a las torres enemigas
+    sin necesariamente buscar el combate directo. Implica aprovechar la
+    ventaja de n\'umero de tropas para presionar estructuras.
+
+  \item[APM (Actions Per Minute)] N\'umero de acciones (clics, comandos) que un
+    jugador ejecuta por minuto. Indicador de la velocidad y precisi\'on mec\'anica.
+
+\end{description}
+
+\subsection*{T\'erminos de an\'alisis de datos}
+
+\begin{description}[leftmargin=4.2cm, style=nextline, itemsep=5pt]
+
+  \item[Dataset] Una tabla estructurada de datos. Aqu\'i, cada fila es una partida
+    y cada columna es una caracter\'istica medida (GPM, torres, etc.).
+
+  \item[Variable objetivo] La columna que se quiere predecir. Aqu\'i es
+    \texttt{radiant\_win}: si gan\'o Radiant (verdadero / falso).
+
+  \item[Feature / Atributo] Una columna del dataset usada como entrada para el
+    an\'alisis. Por ejemplo, el GPM o el KDA son features.
+
+  \item[Ventana hist\'orica] Las $N$ partidas previas promediadas para calcular
+    las estad\'isticas de cada equipo. Si \texttt{freq\_r = 60}, las estad\'isticas
+    de Radiant son el promedio de sus \'ultimas 60 partidas.
+
+  \item[Pick rate] La fracci\'on de partidas (dentro de la ventana hist\'orica) en
+    la que un h\'eroe fue elegido. Un pick rate de 0.30 significa que el h\'eroe
+    se selecci\'on\'o en el 30\,\% de las partidas recientes del equipo.
+
+  \item[Imputaci\'on] El proceso de rellenar valores faltantes con una estimaci\'on.
+    Aqu\'i se us\'o la \textbf{media columnar}: si un equipo no tiene historial,
+    se le asigna el promedio global de todos los equipos para esa estad\'istica.
+
+  \item[KNN (K-Nearest Neighbors)] Algoritmo que encuentra las $K$ partidas m\'as
+    similares a una consulta midiendo distancias. Sirve para responder
+    ``¿cu\'ales partidas del pasado se parecen m\'as a esta?''.
+
+  \item[BallTree] Estructura de datos que organiza los registros en jerarqu\'ia
+    para acelerar la b\'usqueda de vecinos cercanos. Sin ella, comparar una
+    partida contra 47\,150 ser\'ia lento; con BallTree la b\'usqueda es instant\'anea.
+
+  \item[Correlaci\'on de Pearson] N\'umero entre $-1$ y $+1$ que mide cu\'an
+    relacionadas est\'an dos variables linealmente. $+1$: si una sube, la otra
+    tambi\'en. $-1$: si una sube, la otra baja. $0$: no hay relaci\'on lineal.
+
+  \item[StandardScaler] Transformaci\'on que lleva todas las variables al mismo
+    rango (media 0, desviaci\'on est\'andar 1). Necesaria porque el GPM ($\sim$400)
+    y los kills de Roshan ($\sim$0.3) est\'an en escalas muy diferentes; sin
+    normalizar, el KNN dar\'ia m\'as peso al GPM solo por ser un n\'umero mayor.
+
+  \item[EDA] \textit{Exploratory Data Analysis} --- An\'alisis Exploratorio de
+    Datos: el proceso de examinar el dataset con gr\'aficos y estad\'isticas
+    descriptivas antes de construir modelos, para entender su estructura y
+    formular hip\'otesis.
+
+  \item[Valor nulo / NaN] Un valor faltante en el dataset. ``NaN'' viene de
+    \textit{Not a Number} y significa que esa celda est\'a vac\'ia.
+
+  \item[Outlier] Un valor extremo alejado del resto. Por ejemplo, una partida
+    con GPM de 1\,500 cuando la mayor\'ia tiene 400--600 ser\'ia un outlier.
+
+  \item[Distribuci\'on de densidad] Curva que muestra con qu\'e frecuencia aparecen
+    los diferentes valores de una variable. Permite comparar grupos de tama\~nos
+    distintos en la misma escala, a diferencia del histograma de frecuencias.
+
+\end{description}
 
 \newpage
 \section*{Referencias}

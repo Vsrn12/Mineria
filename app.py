@@ -490,11 +490,18 @@ def api_knn():
 @app.route("/api/graficos")
 def api_graficos():
     """
-    Devuelve los datos para los 4 gráficos de la pestaña Gráficos:
-      1. Top 50 héroes por frecuencia + winrate
-      2. GPM y XPM promedio (equipo ganador vs perdedor)
-      3. Winrate global Radiant vs Dire
-      4. Estadísticas de anomalías (partidas sin datos de héroes)
+    Devuelve los datos para los 11 gráficos de la pestaña Gráficos:
+      1. Top 50 héroes por frecuencia + winrate        (Meta / H1)
+      2. GPM y XPM promedio (Radiant vs Dire)           (H1)
+      3. Winrate global Radiant vs Dire                 (balance)
+      4. Anomalías del dataset por año                  (calidad)
+      5. KDA ganadores vs perdedores                    (H2)
+      6. Control de visión (wards)                      (H3)
+      7. Diferencia en objetivos (torres, kills, etc.)  (H4, H5)
+      8. Duración promedio ganando vs perdiendo          (H4, H7)
+      9. GPM por año (ganadores vs perdedores)           (H1 temporal)
+     10. Ventana histórica y win rate                   (H6)
+     11. Correlaciones Pearson con radiant_win          (H1-H5)
     """
     nombres = obtener_hero_nombres()
 
@@ -572,11 +579,174 @@ def api_graficos():
         "dire_pct":     round((total_all - rad_wins) / total_all * 100, 1),
     }
 
+    # ── Helper: medias de ganadores y perdedores para col_r / col_d ─────────
+    def win_lose_means(col_r, col_d):
+        win  = pd.concat([
+            df_v.loc[df_v["radiant_win"] == True,  col_r],
+            df_v.loc[df_v["radiant_win"] == False, col_d],
+        ]).dropna()
+        lose = pd.concat([
+            df_v.loc[df_v["radiant_win"] == False, col_r],
+            df_v.loc[df_v["radiant_win"] == True,  col_d],
+        ]).dropna()
+        return (
+            round(float(win.mean()),  4) if len(win)  else 0.0,
+            round(float(lose.mean()), 4) if len(lose) else 0.0,
+        )
+
+    # ── 5. KDA ganadores vs perdedores (con histograma de densidad) ───────────
+    kda_winners = pd.concat([
+        df_v.loc[df_v["radiant_win"] == True,  "kda_avg_r"],
+        df_v.loc[df_v["radiant_win"] == False, "kda_avg_d"],
+    ]).dropna()
+    kda_losers = pd.concat([
+        df_v.loc[df_v["radiant_win"] == False, "kda_avg_r"],
+        df_v.loc[df_v["radiant_win"] == True,  "kda_avg_d"],
+    ]).dropna()
+    bins_kda   = np.linspace(0.5, 8, 61)
+    hist_kw, _ = np.histogram(kda_winners.clip(0.5, 8), bins=bins_kda, density=True)
+    hist_kl, _ = np.histogram(kda_losers.clip(0.5, 8),  bins=bins_kda, density=True)
+    bin_c_kda  = [(bins_kda[i] + bins_kda[i + 1]) / 2 for i in range(len(bins_kda) - 1)]
+    kda = {
+        "winner":      round(float(kda_winners.mean()), 3),
+        "loser":       round(float(kda_losers.mean()),  3),
+        "bin_centers": [round(float(v), 3) for v in bin_c_kda],
+        "hist_win":    [round(float(v), 4) for v in hist_kw],
+        "hist_lose":   [round(float(v), 4) for v in hist_kl],
+    }
+
+    # ── 6. Control de visión ──────────────────────────────────────────────────
+    vision_items = [
+        ("Observer colocadas", "observer_uses_avg_r",  "observer_uses_avg_d"),
+        ("Observer destruidas","observer_kills_avg_r", "observer_kills_avg_d"),
+        ("Sentry colocadas",   "sentry_uses_avg_r",    "sentry_uses_avg_d"),
+        ("Sentry destruidas",  "sentry_kills_avg_r",   "sentry_kills_avg_d"),
+    ]
+    vision = [
+        {"label": lbl, "winner": w, "loser": l}
+        for lbl, cr, cd in vision_items
+        for w, l in [win_lose_means(cr, cd)]
+    ]
+
+    # ── 7. Diferencia en objetivos ────────────────────────────────────────────
+    obj_items = [
+        ("Torres destruidas",  "tower_kills_avg_r",    "tower_kills_avg_d"),
+        ("Kills de héroes",    "hero_kills_avg_r",     "hero_kills_avg_d"),
+        ("Daño a torres",      "tower_damage_avg_r",   "tower_damage_avg_d"),
+        ("Muertes de Roshan",  "roshan_kills_avg_r",   "roshan_kills_avg_d"),
+        ("Kills neutrales",    "neutral_kills_avg_r",  "neutral_kills_avg_d"),
+    ]
+    objetivos = []
+    for lbl, cr, cd in obj_items:
+        w, l = win_lose_means(cr, cd)
+        diff = round((w - l) / l * 100, 1) if l > 0 else 0.0
+        objetivos.append({"label": lbl, "winner": w, "loser": l, "diff_pct": diff})
+
+    # ── 8. Duración ganando vs perdiendo (histograma de densidad) ─────────────
+    # Columnas ya en minutos (igual que el notebook: bins 20-70 min)
+    dur_w = df_v["duration_avg_win_r"].dropna()
+    dur_l = df_v["duration_avg_lose_r"].dropna()
+    bins_dur   = np.linspace(20, 70, 51)
+    hist_dw, _ = np.histogram(dur_w.clip(20, 70), bins=bins_dur, density=True)
+    hist_dl, _ = np.histogram(dur_l.clip(20, 70), bins=bins_dur, density=True)
+    bin_c_dur  = [(bins_dur[i] + bins_dur[i + 1]) / 2 for i in range(len(bins_dur) - 1)]
+    duracion = {
+        "mean_win":    round(float(dur_w.mean()),   1),
+        "mean_lose":   round(float(dur_l.mean()),   1),
+        "bin_centers": [round(float(v), 2) for v in bin_c_dur],
+        "hist_win":    [round(float(v), 4) for v in hist_dw],
+        "hist_lose":   [round(float(v), 4) for v in hist_dl],
+    }
+
+    # ── 9. GPM por año ────────────────────────────────────────────────────────
+    years = sorted([int(y) for y in df_v["_year"].dropna().unique()])
+    gpm_anio = []
+    for yr in years:
+        sub = df_v[df_v["_year"] == yr]
+        gw = pd.concat([
+            sub.loc[sub["radiant_win"] == True,  "gold_per_min_avg_r"],
+            sub.loc[sub["radiant_win"] == False, "gold_per_min_avg_d"],
+        ]).dropna().mean()
+        gl = pd.concat([
+            sub.loc[sub["radiant_win"] == False, "gold_per_min_avg_r"],
+            sub.loc[sub["radiant_win"] == True,  "gold_per_min_avg_d"],
+        ]).dropna().mean()
+        gpm_anio.append({
+            "year":   yr,
+            "winner": round(float(gw), 1) if not math.isnan(gw) else 0.0,
+            "loser":  round(float(gl), 1) if not math.isnan(gl) else 0.0,
+        })
+
+    # ── 10. Ventana histórica y win rate ──────────────────────────────────────
+    bins   = [0, 10, 30, 60, 100, 200, 1000]
+    labels = ["1-10", "11-30", "31-60", "61-100", "101-200", "201+"]
+    df_v2  = df_v.copy()
+    df_v2["_freq_bucket"] = pd.cut(
+        df_v2["freq_r"].fillna(0), bins=bins, labels=labels, right=True
+    )
+    bucket_agg = (
+        df_v2.groupby("_freq_bucket", observed=True)["win_pct_r"]
+        .agg(mean="mean", std="std", count="count")
+        .reset_index()
+    )
+    ventana_hist = []
+    for _, brow in bucket_agg.iterrows():
+        ventana_hist.append({
+            "bucket":   str(brow["_freq_bucket"]),
+            "mean_pct": round(float(brow["mean"]) * 100, 2) if not math.isnan(brow["mean"]) else 0.0,
+            "std_pct":  round(float(brow["std"])  * 100, 2) if not math.isnan(brow["std"])  else 0.0,
+            "count":    int(brow["count"]),
+        })
+
+    # ── 11. Correlaciones con radiant_win ─────────────────────────────────────
+    corr_cols = [
+        "win_pct_r", "kda_avg_r", "gold_per_min_avg_r", "xp_per_min_avg_r",
+        "hero_kills_avg_r", "deaths_avg_r", "assists_avg_r",
+        "tower_kills_avg_r", "tower_damage_avg_r", "roshan_kills_avg_r",
+        "observer_uses_avg_r", "sentry_uses_avg_r",
+        "last_hits_avg_r", "denies_avg_r", "neutral_kills_avg_r",
+        "firstblood_claimed_avg_r", "buyback_count_avg_r",
+    ]
+    corr_cols_ok = [c for c in corr_cols if c in df_v.columns]
+    corr_series  = df_v[corr_cols_ok + ["radiant_win"]].corr()["radiant_win"].drop("radiant_win")
+    corr_series  = corr_series.sort_values(ascending=False)
+    # Labels legibles
+    label_map = {
+        "win_pct_r":              "Win Rate histórico (R)",
+        "kda_avg_r":              "KDA",
+        "gold_per_min_avg_r":     "GPM (oro/min)",
+        "xp_per_min_avg_r":       "XPM (exp/min)",
+        "hero_kills_avg_r":       "Kills de héroes",
+        "deaths_avg_r":           "Muertes",
+        "assists_avg_r":          "Asistencias",
+        "tower_kills_avg_r":      "Torres destruidas",
+        "tower_damage_avg_r":     "Daño a torres",
+        "roshan_kills_avg_r":     "Muertes de Roshan",
+        "observer_uses_avg_r":    "Observer wards",
+        "sentry_uses_avg_r":      "Sentry wards",
+        "last_hits_avg_r":        "Last hits",
+        "denies_avg_r":           "Denies",
+        "neutral_kills_avg_r":    "Kills neutrales",
+        "firstblood_claimed_avg_r":"First blood",
+        "buyback_count_avg_r":    "Buybacks",
+    }
+    correlaciones = [
+        {"feature": label_map.get(k, k), "value": round(float(v), 4)}
+        for k, v in corr_series.items()
+    ]
+
     return jsonify({
         "top50_heroes": top50,
         "gpm_xpm":      gpm_xpm,
         "win_rates":    win_rates,
         "anomaly":      anomaly_stats,
+        "kda":          kda,
+        "vision":       vision,
+        "objetivos":    objetivos,
+        "duracion":     duracion,
+        "gpm_anio":     gpm_anio,
+        "ventana_hist": ventana_hist,
+        "correlaciones":correlaciones,
     })
 
 

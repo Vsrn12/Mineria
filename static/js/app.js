@@ -828,6 +828,403 @@ async function cargarGraficos() {
       },
     },
   });
+
+  // ── GRÁFICO 5: KDA Ganadores vs Perdedores ────────────────────────────────
+  const kda = d.kda;
+  const ctx5 = document.getElementById('chartKda').getContext('2d');
+  // Plugin para líneas verticales de media (imita axvline del notebook)
+  const kdaMeanLinePlugin = {
+    id: 'kdaMeanLines',
+    afterDatasetsDraw(chart) {
+      const {ctx, scales: {x, y}} = chart;
+      const drawVLine = (meanVal, color) => {
+        let idx = 0, minD = Infinity;
+        kda.bin_centers.forEach((bc, i) => { const d = Math.abs(bc - meanVal); if (d < minD) { minD = d; idx = i; } });
+        const xp = x.getPixelForTick(idx);
+        ctx.save();
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(xp, y.top); ctx.lineTo(xp, y.bottom); ctx.stroke();
+        ctx.restore();
+      };
+      drawVLine(kda.winner, 'rgba(60,181,106,1)');
+      drawVLine(kda.loser,  'rgba(224,92,92,1)');
+    }
+  };
+  new Chart(ctx5, {
+    type: 'bar',
+    data: {
+      labels: kda.bin_centers.map(v => v.toFixed(1)),
+      datasets: [
+        {
+          label: `Ganador (media=${kda.winner.toFixed(2)})`,
+          data: kda.hist_win,
+          backgroundColor: 'rgba(60,181,106,0.55)',
+          borderColor:     'rgba(60,181,106,0.0)',
+          borderWidth: 0,
+          categoryPercentage: 1.0, barPercentage: 1.0,
+          order: 2,
+        },
+        {
+          label: `Perdedor (media=${kda.loser.toFixed(2)})`,
+          data: kda.hist_lose,
+          backgroundColor: 'rgba(224,92,92,0.55)',
+          borderColor:     'rgba(224,92,92,0.0)',
+          borderWidth: 0,
+          categoryPercentage: 1.0, barPercentage: 1.0,
+          order: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { enabled: false },
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { maxTicksLimit: 10, callback: (_, i) => i % 6 === 0 ? kda.bin_centers[i].toFixed(1) : '' },
+          title: { display: true, text: 'KDA histórico del equipo', color: fontColor },
+        },
+        y: {
+          grid: { color: gridColor },
+          title: { display: true, text: 'Densidad', color: fontColor },
+        },
+      },
+    },
+    plugins: [kdaMeanLinePlugin],
+  });
+  const kdaDiff = (((kda.winner - kda.loser) / kda.loser) * 100).toFixed(1);
+  document.getElementById('kdaHallazgo').innerHTML =
+    `<i class="bi bi-check-circle-fill" style="color:#5cbf8a"></i>
+     <strong style="color:var(--dota-gold)">Hallazgo H2:</strong>
+     Los ganadores tienen un KDA de <strong>${kda.winner.toFixed(2)}</strong> vs
+     <strong>${kda.loser.toFixed(2)}</strong> de los perdedores —
+     una diferencia del <strong>${kdaDiff}%</strong>.
+     Un KDA alto refleja sobrevivir y participar en los fights, correlacionado con la victoria.`;
+
+  // ── GRÁFICO 6: Control de Visión ──────────────────────────────────────────
+  const vision = d.vision;
+  const ctx6 = document.getElementById('chartVision').getContext('2d');
+  new Chart(ctx6, {
+    type: 'bar',
+    data: {
+      labels: vision.map(v => v.label),
+      datasets: [
+        {
+          label: 'Ganadores',
+          data: vision.map(v => v.winner),
+          backgroundColor: 'rgba(92,191,138,0.75)',
+          borderColor: 'rgba(92,191,138,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+        {
+          label: 'Perdedores',
+          data: vision.map(v => v.loser),
+          backgroundColor: 'rgba(191,92,92,0.70)',
+          borderColor: 'rgba(191,92,92,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { grid: { color: gridColor }, title: { display: true, text: 'Promedio por partida', color: fontColor } },
+        x: { grid: { color: gridColor } },
+      },
+    },
+  });
+  const obsW = vision.find(v => v.label === 'Observer colocadas');
+  if (obsW) {
+    const pct = (((obsW.winner - obsW.loser) / obsW.loser) * 100).toFixed(1);
+    document.getElementById('visionHallazgo').innerHTML =
+      `<i class="bi bi-check-circle-fill" style="color:#64a0dc"></i>
+       <strong style="color:var(--dota-gold)">Hallazgo H3:</strong>
+       Los ganadores colocan un <strong>${pct}% más</strong> de observer wards que los perdedores.
+       La visión del mapa es una ventaja operacional clave en partidas profesionales.`;
+  }
+
+  // ── GRÁFICO 7: Objetivos (diferencia %) ───────────────────────────────────
+  const objetivos = d.objetivos;
+  const ctx7 = document.getElementById('chartObjetivos').getContext('2d');
+  const objDiffs  = objetivos.map(o => o.diff_pct);
+  const objColors = objDiffs.map(v => v >= 0 ? 'rgba(92,191,138,0.82)' : 'rgba(191,92,92,0.82)');
+  new Chart(ctx7, {
+    type: 'bar',
+    data: {
+      labels: objetivos.map(o => o.label),
+      datasets: [{
+        label: 'Diferencia ganador vs perdedor (%)',
+        data: objDiffs,
+        backgroundColor: objColors,
+        borderColor: objColors.map(c => c.replace('0.82', '1')),
+        borderWidth: 1, borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` +${c.parsed.x.toFixed(1)}% más que perdedor` } },
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { callback: v => v + '%' },
+          title: { display: true, text: 'Diferencia porcentual (ganador vs perdedor)', color: fontColor },
+        },
+        y: { grid: { color: gridColor } },
+      },
+    },
+  });
+  const torres = objetivos.find(o => o.label === 'Torres destruidas');
+  const kills  = objetivos.find(o => o.label === 'Kills de héroes');
+  if (torres && kills) {
+    document.getElementById('objetivosHallazgo').innerHTML =
+      `<i class="bi bi-check-circle-fill" style="color:#dc8c3c"></i>
+       <strong style="color:var(--dota-gold)">Hallazgo H4/H5:</strong>
+       Torres destruidas tienen una diferencia del <strong>+${torres.diff_pct}%</strong> entre ganadores y perdedores,
+       vs <strong>+${kills.diff_pct}%</strong> en kills de héroes.
+       ${torres.diff_pct > kills.diff_pct
+         ? 'Las <strong>torres</strong> diferencian más que los kills — confirmando H5.'
+         : 'Los kills diferencian más que las torres en este dataset.'}`;
+  }
+
+  // ── GRÁFICO 8: Duración ganando vs perdiendo ──────────────────────────────
+  const dur = d.duracion;
+  const ctx8 = document.getElementById('chartDuracion').getContext('2d');
+  // Las columnas ya están en minutos (igual que el notebook: bins 20-70 min)
+  const durMeanLinePlugin = {
+    id: 'durMeanLines',
+    afterDatasetsDraw(chart) {
+      const {ctx: c8ctx, scales: {x, y}} = chart;
+      const drawVLine = (meanVal, color) => {
+        let idx = 0, minD = Infinity;
+        dur.bin_centers.forEach((bc, i) => { const d = Math.abs(bc - meanVal); if (d < minD) { minD = d; idx = i; } });
+        const xp = x.getPixelForTick(idx);
+        c8ctx.save();
+        c8ctx.strokeStyle = color; c8ctx.lineWidth = 1.5; c8ctx.setLineDash([4, 4]);
+        c8ctx.beginPath(); c8ctx.moveTo(xp, y.top); c8ctx.lineTo(xp, y.bottom); c8ctx.stroke();
+        c8ctx.restore();
+      };
+      drawVLine(dur.mean_win,  'rgba(60,181,106,1)');
+      drawVLine(dur.mean_lose, 'rgba(224,92,92,1)');
+    }
+  };
+  new Chart(ctx8, {
+    type: 'bar',
+    data: {
+      labels: dur.bin_centers.map(v => v.toFixed(1)),
+      datasets: [
+        {
+          label: `Ganando (μ=${dur.mean_win.toFixed(1)} min)`,
+          data: dur.hist_win,
+          backgroundColor: 'rgba(60,181,106,0.55)',
+          borderColor:     'rgba(60,181,106,0.0)',
+          borderWidth: 0,
+          categoryPercentage: 1.0, barPercentage: 1.0,
+          order: 2,
+        },
+        {
+          label: `Perdiendo (μ=${dur.mean_lose.toFixed(1)} min)`,
+          data: dur.hist_lose,
+          backgroundColor: 'rgba(224,92,92,0.55)',
+          borderColor:     'rgba(224,92,92,0.0)',
+          borderWidth: 0,
+          categoryPercentage: 1.0, barPercentage: 1.0,
+          order: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { enabled: false },
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { maxTicksLimit: 10, callback: (_, i) => i % 5 === 0 ? dur.bin_centers[i].toFixed(0) + ' min' : '' },
+          title: { display: true, text: 'Duración promedio (minutos)', color: fontColor },
+        },
+        y: {
+          grid: { color: gridColor },
+          title: { display: true, text: 'Densidad', color: fontColor },
+        },
+      },
+    },
+    plugins: [durMeanLinePlugin],
+  });
+  const diffDur = (dur.mean_lose - dur.mean_win).toFixed(1);
+  document.getElementById('duracionHallazgo').innerHTML =
+    `<i class="bi bi-clock" style="color:#b464dc"></i>
+     <strong style="color:var(--dota-gold)">Hallazgo H7:</strong>
+     Las partidas ganadas duran en promedio <strong>${dur.mean_win.toFixed(1)} min</strong> vs
+     <strong>${dur.mean_lose.toFixed(1)} min</strong> cuando se pierde (diferencia: ${diffDur} min).
+     ${parseFloat(diffDur) > 0
+       ? 'Las partidas que se pierden tienden a ser más largas, consistente con H7: el late-game favorece a Dire.'
+       : 'Las partidas ganadas son más largas — sugiere que H7 requiere análisis adicional.'}`;
+
+  // ── GRÁFICO 9: GPM por Año ────────────────────────────────────────────────
+  const gpmAnio = d.gpm_anio;
+  const ctx9 = document.getElementById('chartGpmAnio').getContext('2d');
+  new Chart(ctx9, {
+    type: 'bar',
+    data: {
+      labels: gpmAnio.map(g => String(g.year)),
+      datasets: [
+        {
+          label: 'GPM Ganadores',
+          data: gpmAnio.map(g => g.winner),
+          backgroundColor: 'rgba(92,191,138,0.75)',
+          borderColor: 'rgba(92,191,138,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+        {
+          label: 'GPM Perdedores',
+          data: gpmAnio.map(g => g.loser),
+          backgroundColor: 'rgba(191,92,92,0.70)',
+          borderColor: 'rgba(191,92,92,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: {
+          grid: { color: gridColor },
+          ticks: { callback: v => v.toLocaleString() },
+          title: { display: true, text: 'GPM (Oro por minuto)', color: fontColor },
+        },
+        x: { grid: { color: gridColor } },
+      },
+    },
+  });
+
+  // ── GRÁFICO 10: Ventana histórica y Win Rate ──────────────────────────────
+  const ventana = d.ventana_hist;
+  const ctx10 = document.getElementById('chartVentana').getContext('2d');
+  const ventanaErrPlugin = {
+    id: 'ventanaErrBars',
+    afterDatasetsDraw(chart) {
+      const {ctx: c10ctx, scales: {x, y}} = chart;
+      c10ctx.save();
+      c10ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      c10ctx.lineWidth = 1.5;
+      ventana.forEach((item, i) => {
+        const mean = item.mean_pct, std = item.std_pct;
+        if (!std) return;
+        const xp = x.getPixelForTick(i);
+        const yU = y.getPixelForValue(mean + std);
+        const yD = y.getPixelForValue(mean - std);
+        c10ctx.beginPath(); c10ctx.moveTo(xp, yU); c10ctx.lineTo(xp, yD); c10ctx.stroke();
+        c10ctx.beginPath(); c10ctx.moveTo(xp - 5, yU); c10ctx.lineTo(xp + 5, yU); c10ctx.stroke();
+        c10ctx.beginPath(); c10ctx.moveTo(xp - 5, yD); c10ctx.lineTo(xp + 5, yD); c10ctx.stroke();
+      });
+      c10ctx.restore();
+    }
+  };
+  new Chart(ctx10, {
+    type: 'bar',
+    data: {
+      labels: ventana.map(v => v.bucket + ' partidas'),
+      datasets: [
+        {
+          label: 'Win Rate promedio (%)',
+          data: ventana.map(v => v.mean_pct),
+          backgroundColor: 'rgba(26,188,156,0.80)',
+          borderColor: 'rgba(26,188,156,1)',
+          borderWidth: 1, borderRadius: 3, yAxisID: 'y',
+        },
+        {
+          label: 'Nº partidas',
+          data: ventana.map(v => v.count),
+          type: 'line',
+          borderColor: 'rgba(200,151,58,0.9)',
+          backgroundColor: 'rgba(200,151,58,0.0)',
+          borderWidth: 2, pointRadius: 5,
+          pointBackgroundColor: 'rgba(200,151,58,1)',
+          fill: false, tension: 0.3, yAxisID: 'y2',
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: {
+          grid: { color: gridColor },
+          min: 45, max: 56,
+          ticks: { callback: v => v.toFixed(1) + '%' },
+          title: { display: true, text: 'Win rate promedio (%)', color: fontColor },
+          position: 'left',
+        },
+        y2: {
+          grid: { display: false },
+          ticks: { callback: v => v.toLocaleString() },
+          title: { display: true, text: 'Nº de partidas', color: 'rgba(200,151,58,0.9)' },
+          position: 'right',
+        },
+        x: { grid: { color: gridColor } },
+      },
+    },
+    plugins: [ventanaErrPlugin],
+  });
+
+  // ── GRÁFICO 11: Correlaciones con radiant_win ─────────────────────────────
+  const corrs = d.correlaciones;
+  const ctx11 = document.getElementById('chartCorr').getContext('2d');
+  const corrColors = corrs.map(c =>
+    c.value > 0.05  ? 'rgba(92,191,138,0.82)'  :
+    c.value < -0.05 ? 'rgba(191,92,92,0.82)'   :
+                      'rgba(150,150,170,0.60)'
+  );
+  new Chart(ctx11, {
+    type: 'bar',
+    data: {
+      labels: corrs.map(c => c.feature),
+      datasets: [{
+        label: 'Correlación de Pearson con radiant_win',
+        data: corrs.map(c => c.value),
+        backgroundColor: corrColors,
+        borderColor: corrColors.map(c => c.replace('0.82', '1').replace('0.60', '0.9')),
+        borderWidth: 1, borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` r = ${c.parsed.x.toFixed(4)}` } },
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          title: { display: true, text: 'Coeficiente de correlación de Pearson (r)', color: fontColor },
+          min: -0.5, max: 0.5,
+          ticks: { callback: v => v.toFixed(2) },
+        },
+        y: { grid: { color: gridColor }, ticks: { font: { size: 10 } } },
+      },
+    },
+  });
+  const topCorr = corrs[0];
+  const botCorr = corrs[corrs.length - 1];
+  document.getElementById('corrHallazgo').innerHTML =
+    `<i class="bi bi-bar-chart-steps" style="color:#5cbf8a"></i>
+     <strong style="color:var(--dota-gold)">Hallazgo global:</strong>
+     La variable con mayor correlación positiva es <strong>${topCorr.feature}</strong>
+     (r = ${topCorr.value.toFixed(4)}), y la mayor correlación negativa es <strong>${botCorr.feature}</strong>
+     (r = ${botCorr.value.toFixed(4)}).
+     Verde = más de esa métrica → más victorias Radiant. Rojo = más de esa métrica → más victorias Dire.`;
 }
 
 // ─── Inicio de la aplicación ─────────────────────────────────────────────────

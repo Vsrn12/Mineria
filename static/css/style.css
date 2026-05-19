@@ -116,6 +116,9 @@ body {
   letter-spacing: .05em;
   color: var(--dota-text);
   border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
 }
 
 /* ── TABLA ── */
@@ -155,6 +158,21 @@ body {
   font-size: .72rem; font-weight: 700;
   white-space: nowrap;
 }
+
+/* ── BADGES DE HIPÓTESIS ── */
+.badge-hip {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: .72rem; font-weight: 700;
+  border: 1px solid; white-space: nowrap;
+  display: inline-flex; align-items: center;
+}
+.badge-h1 { background: rgba(92,191,138,.13); color: #5cbf8a; border-color: rgba(92,191,138,.35); }
+.badge-h2 { background: rgba(200,151,58,.13);  color: var(--dota-gold); border-color: rgba(200,151,58,.35); }
+.badge-h3 { background: rgba(100,160,220,.13); color: #64a0dc; border-color: rgba(100,160,220,.35); }
+.badge-h4 { background: rgba(180,100,220,.13); color: #b464dc; border-color: rgba(180,100,220,.35); }
+.badge-h5 { background: rgba(220,140,60,.13);  color: #dc8c3c; border-color: rgba(220,140,60,.35); }
+.badge-h6 { background: rgba(60,200,200,.13);  color: #3cc8c8; border-color: rgba(60,200,200,.35); }
+.badge-h7 { background: rgba(191,92,92,.13);   color: var(--dota-dire); border-color: rgba(191,92,92,.35); }
 
 /* ── HERO META GRID (estilo circular) ── */
 .hero-meta-grid {
