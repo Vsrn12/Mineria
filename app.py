@@ -14,6 +14,14 @@ import pandas as pd
 from flask import Flask, jsonify, request, render_template
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import inspect as _inspect
+try:
+    import umap as umap_lib
+    UMAP_AVAILABLE = True
+except ImportError:
+    UMAP_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -747,6 +755,88 @@ def api_graficos():
         "gpm_anio":     gpm_anio,
         "ventana_hist": ventana_hist,
         "correlaciones":correlaciones,
+    })
+
+
+# ─── API: espacio latente (PCA / UMAP / t-SNE) ─────────────────────────────────
+
+@app.route("/api/espacio-latente")
+def api_espacio_latente():
+    """
+    Proyecta el vector de características de cada partida a 2 dimensiones
+    usando reducción de dimensionalidad (PCA, UMAP o t-SNE).
+    Query params:
+        method : 'pca' | 'umap' | 'tsne'  (default: 'pca')
+        n      : número de muestras        (default: 1000, máx: 3000)
+    """
+    method    = request.args.get("method", "pca").lower()
+    n_samples = min(int(request.args.get("n", 1000)), 3000)
+
+    df_v = df_raw[df_raw["_has_heroes"] == True].copy()
+    if len(df_v) > n_samples:
+        df_v = df_v.sample(n=n_samples, random_state=42)
+
+    # Matriz de características (knn_cols ya tienen NaN rellenos desde cargar_datos)
+    X        = df_v[knn_cols].values
+    X_scaled = scaler.transform(X)
+
+    method_used = method
+    extra       = {}
+
+    if method == "tsne":
+        perp = min(30, len(df_v) - 1)
+        # Compatibilidad sklearn 1.4 (n_iter) vs 1.5+ (max_iter)
+        tsne_sig   = _inspect.signature(TSNE.__init__).parameters
+        iter_kwarg = "max_iter" if "max_iter" in tsne_sig else "n_iter"
+        reducer = TSNE(n_components=2, random_state=42, perplexity=perp,
+                       **{iter_kwarg: 300})
+        X2 = reducer.fit_transform(X_scaled)
+
+    elif method == "umap" and UMAP_AVAILABLE:
+        reducer = umap_lib.UMAP(n_components=2, random_state=42,
+                                n_neighbors=15, min_dist=0.1)
+        X2 = reducer.fit_transform(X_scaled)
+
+    else:
+        if method == "umap":
+            method_used = "pca"
+        pca = PCA(n_components=2, random_state=42)
+        X2  = pca.fit_transform(X_scaled)
+        extra["explained_variance"] = [
+            round(float(v), 4) for v in pca.explained_variance_ratio_
+        ]
+
+    # Columnas adicionales a incluir en cada punto para el frontend
+    DETAIL_COLS = [
+        "win_pct_r", "kda_avg_r", "gold_per_min_avg_r", "xp_per_min_avg_r",
+        "hero_kills_avg_r", "deaths_avg_r", "tower_kills_avg_r",
+        "win_pct_d", "kda_avg_d", "gold_per_min_avg_d", "xp_per_min_avg_d",
+        "hero_kills_avg_d", "deaths_avg_d", "tower_kills_avg_d",
+    ]
+    detail_cols_ok = [c for c in DETAIL_COLS if c in df_v.columns]
+
+    puntos = []
+    for i, (_, row) in enumerate(df_v.iterrows()):
+        p = {
+            "match_id":    int(row["match_id"]),
+            "x":           round(float(X2[i, 0]), 4),
+            "y":           round(float(X2[i, 1]), 4),
+            "radiant_win": bool(row["radiant_win"]),
+        }
+        for col in detail_cols_ok:
+            v = row[col]
+            p[col] = round(float(v), 4) if pd.notna(v) else None
+        puntos.append(p)
+
+    return jsonify({
+        "puntos": puntos,
+        "meta": {
+            "method":           method_used,
+            "method_requested": method,
+            "umap_available":   UMAP_AVAILABLE,
+            "n_used":           len(puntos),
+            **extra,
+        },
     })
 
 

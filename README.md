@@ -651,6 +651,69 @@ Abrir en el navegador: **http://localhost:5000**
 | GET    | /api/heroes/nombres       | Mapeo completo id → nombre + URL imagen                |
 | POST   | /api/knn                  | Similares + top 5 héroes por cada partida similar      |
 | GET    | /api/graficos             | Datos para los 4 gráficos (héroes, GPM/XPM, etc.)     |
+| GET    | /api/espacio-latente      | Proyección 2D del vector de características (PCA/UMAP/t-SNE) |
+
+---
+
+## Pestaña: Espacio Latente
+
+La pestaña **Espacio Latente** aplica técnicas de reducción de dimensionalidad
+para proyectar el vector de ~60 características de cada partida a un espacio 2D
+navegable con D3.js.
+
+### ¿Qué hace?
+
+El vector de características de cada partida contiene ~60 columnas numéricas
+(estadísticas de Radiant y Dire: GPM, XPM, KDA, torres, visión, etc.).
+Este módulo reduce ese vector a exactamente **2 dimensiones (x, y)**
+para poder representar cada partida como un punto en un plano interactivo.
+
+### Métodos de reducción de dimensionalidad
+
+| Método | Descripción | Ventaja |
+|--------|-------------|---------|
+| **PCA** | Proyección lineal que maximiza la varianza explicada | Rápido, reproducible, muestra % varianza |
+| **UMAP** | Proyección no lineal basada en geometría topológica | Preserva estructura local y global |
+| **t-SNE** | Proyección estocástica por divergencia KL | Revela clústeres locales con claridad |
+
+> **Nota UMAP:** Requiere `umap-learn` instalado (`pip install umap-learn`).
+> Si no está disponible el backend usa PCA como fallback automático.
+
+### Cuatro paneles enlazados (D3.js)
+
+```
+┌─────────────────────────┬─────────────────────────┐
+│  Panel 1                │  Panel 2                │
+│  Espacio Latente        │  Atributos del Punto    │
+│  Color = Radiant/Dire   │  Barras Radiant vs Dire │
+│  (clic para seleccionar)│  (aparece al seleccionar)│
+├─────────────────────────┼─────────────────────────┤
+│  Panel 3                │  Panel 4                │
+│  Espacio Latente        │  Vector de Atributos    │
+│  Color = atributo libre │  Tabla completa del     │
+│  (selector desplegable) │  registro seleccionado  │
+└─────────────────────────┴─────────────────────────┘
+```
+
+**Interacción enlazada:**
+- Clic en un punto de **Panel 1** → resalta ese punto en **Panel 3** y muestra
+  sus atributos en **Panel 2** (barras) y **Panel 4** (tabla completa).
+- Clic en un punto de **Panel 3** → misma lógica, sincroniza con **Panel 1**.
+- Hover muestra un tooltip flotante con match_id, ganador, WR y KDA.
+- Clic en el punto ya seleccionado lo deselecciona y limpia los paneles de detalle.
+
+**Panel 3 — Vista por Atributo:**
+Permite elegir **un solo atributo** del vector de características (ej. GPM Radiant)
+y aplicarlo como gradiente de color a los puntos. Así se puede visualizar
+cómo ese atributo se distribuye en el espacio latente y si forma clústeres.
+
+### Parámetros de carga
+
+| Parámetro | Opciones | Descripción |
+|-----------|----------|-------------|
+| Método | PCA / UMAP / t-SNE | Algoritmo de reducción |
+| Muestras | 500 / 1 000 / 2 000 | Número de partidas a proyectar (muestra aleatoria) |
+| Color Panel 3 | 10 atributos | Atributo cuyo valor colorea los puntos del Panel 3 |
 
 ---
 
@@ -666,4 +729,5 @@ Abrir en el navegador: **http://localhost:5000**
 | CSS Framework    | Bootstrap                           | 5.3.2   |
 | Iconografía      | Bootstrap Icons                     | 1.11.3  |
 | Gráficos         | Chart.js                            | 4.4.3   |
+| Visualización D3 | D3.js (Espacio Latente)             | 7.9.0   |
 | Imágenes         | CDN oficial Steam (OpenDota)        | —       |

@@ -1,5 +1,11 @@
 # Dataset — demasiado pesado para el repositorio
 *.csv
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.pkl
+*.pickle
 
 # Entorno virtual Python
 venv/
@@ -16,5 +22,46 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Variables de entorno
+# Variables de entorno / secretos
 .env
+.env.local
+*.env
+
+# Flask / sesiones
+instance/
+flask_session/
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Distribución Python
+dist/
+build/
+*.egg-info/
+
+# Testing y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# LaTeX auxiliares
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+*.out
+

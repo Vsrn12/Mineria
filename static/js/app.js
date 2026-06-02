@@ -1230,3 +1230,458 @@ async function cargarGraficos() {
 // ─── Inicio de la aplicación ─────────────────────────────────────────────────
 cargarStats();
 cargarPartidas(1);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ESPACIO LATENTE — Visualización D3 con vistas enlazadas
+//  4 paneles: P1 = scatter ganador | P2 = barras atributos | P3 = scatter atributo | P4 = tabla
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Estado global ────────────────────────────────────────────────────────────
+const latentState = {
+  data:     null,   // respuesta de /api/espacio-latente
+  selected: null,   // match_id seleccionado (null = ninguno)
+  hovered:  null,   // match_id bajo el cursor
+};
+const latentCharts    = {};   // { 'latent-p1': {circles}, 'latent-p3': {circles} }
+let   latentTooltipEl = null; // elemento DOM del tooltip flotante
+
+// Atributos disponibles para colorear el Panel 3
+const LATENT_COLOR_ATTRS = [
+  { key: 'radiant_win',        label: 'Ganador (Radiant/Dire)',   type: 'categorical' },
+  { key: 'win_pct_r',          label: 'Win Rate Radiant',         type: 'continuous'  },
+  { key: 'kda_avg_r',          label: 'KDA Radiant',              type: 'continuous'  },
+  { key: 'gold_per_min_avg_r', label: 'GPM Radiant',              type: 'continuous'  },
+  { key: 'xp_per_min_avg_r',   label: 'XPM Radiant',              type: 'continuous'  },
+  { key: 'hero_kills_avg_r',   label: 'Kills Radiant',            type: 'continuous'  },
+  { key: 'deaths_avg_r',       label: 'Muertes Radiant',          type: 'continuous'  },
+  { key: 'tower_kills_avg_r',  label: 'Torres Radiant',           type: 'continuous'  },
+  { key: 'win_pct_d',          label: 'Win Rate Dire',            type: 'continuous'  },
+  { key: 'kda_avg_d',          label: 'KDA Dire',                 type: 'continuous'  },
+  { key: 'gold_per_min_avg_d', label: 'GPM Dire',                 type: 'continuous'  },
+];
+
+// ─── Cargar datos desde el backend ────────────────────────────────────────────
+async function cargarEspacioLatente() {
+  const method = document.getElementById('latentMethod').value;
+  const n      = document.getElementById('latentN').value;
+
+  document.getElementById('latentMeta').textContent = `Calculando ${method.toUpperCase()}…`;
+
+  const spinHtml = `
+    <div style="display:flex;flex-direction:column;align-items:center;
+                justify-content:center;height:360px;gap:1rem">
+      <div class="spinner-dota"></div>
+      <span style="color:var(--dota-muted);font-size:.82rem">
+        ${method.toUpperCase()} — reduciendo ${Number(n).toLocaleString()} registros…
+      </span>
+    </div>`;
+  document.getElementById('latent-p1').innerHTML = spinHtml;
+  document.getElementById('latent-p3').innerHTML = spinHtml;
+  clearLatentP2();
+  clearLatentP4();
+
+  try {
+    const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}`);
+    const data = await resp.json();
+
+    latentState.data     = data;
+    latentState.selected = null;
+    latentState.hovered  = null;
+    delete latentCharts['latent-p1'];
+    delete latentCharts['latent-p3'];
+
+    // Texto informativo de metadatos
+    const meta = data.meta;
+    let metaText = `${meta.n_used.toLocaleString()} puntos · ${meta.method.toUpperCase()}`;
+    if (meta.explained_variance) {
+      const pct = ((meta.explained_variance[0] + meta.explained_variance[1]) * 100).toFixed(1);
+      metaText += ` · varianza explicada PC1+PC2: ${pct}%`;
+    }
+    if (meta.method_requested !== meta.method) {
+      metaText += ' (UMAP no disponible → usando PCA)';
+    }
+    document.getElementById('latentMeta').textContent = metaText;
+
+    renderLatentP1();
+    renderLatentP3();
+    clearLatentP2();
+    clearLatentP4();
+
+  } catch (err) {
+    console.error('Error espacio latente:', err);
+    document.getElementById('latentMeta').textContent = '⚠ Error al calcular';
+  }
+}
+
+// ─── Función de color para los puntos ─────────────────────────────────────────
+function getLatentColorFn(points, attrKey) {
+  const attr = LATENT_COLOR_ATTRS.find(a => a.key === attrKey);
+  if (!attr || attr.type === 'categorical') {
+    return { fn: d => d.radiant_win ? '#5cbf8a' : '#bf5c5c', type: 'categorical' };
+  }
+  const vals        = points.map(d => d[attrKey]).filter(v => v != null);
+  const [mn, mx]    = d3.extent(vals);
+  const cScale      = d3.scaleSequential(d3.interpolateYlOrRd).domain([mn, mx]);
+  return {
+    fn:    d => d[attrKey] != null ? cScale(d[attrKey]) : '#2a3040',
+    type:  'continuous',
+    min:   mn,
+    max:   mx,
+    label: attr.label,
+  };
+}
+
+// ─── Renderizar scatter D3 ────────────────────────────────────────────────────
+function renderLatentScatter(containerId, points, colorInfo, panelTitle) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  const W      = Math.max(container.clientWidth || 460, 320);
+  const H      = 360;
+  const margin = { top: 24, right: 22, bottom: 40, left: 48 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top  - margin.bottom;
+
+  const xExt = d3.extent(points, d => d.x);
+  const yExt = d3.extent(points, d => d.y);
+  const xPad = ((xExt[1] - xExt[0]) || 2) * 0.07;
+  const yPad = ((yExt[1] - yExt[0]) || 2) * 0.07;
+
+  const xScale = d3.scaleLinear()
+    .domain([xExt[0] - xPad, xExt[1] + xPad]).range([0, innerW]);
+  const yScale = d3.scaleLinear()
+    .domain([yExt[0] - yPad, yExt[1] + yPad]).range([innerH, 0]);
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', '100%').attr('height', H)
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Cuadrícula + ejes
+  g.append('g').attr('transform', `translate(0,${innerH})`)
+    .call(d3.axisBottom(xScale).ticks(5).tickSize(-innerH))
+    .call(ax => {
+      ax.selectAll('.tick line').attr('stroke', '#1e2840');
+      ax.selectAll('text').attr('fill', '#5a6a80').attr('font-size', '9px');
+      ax.select('.domain').remove();
+    });
+
+  g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-innerW))
+    .call(ax => {
+      ax.selectAll('.tick line').attr('stroke', '#1e2840');
+      ax.selectAll('text').attr('fill', '#5a6a80').attr('font-size', '9px');
+      ax.select('.domain').remove();
+    });
+
+  // Etiquetas de ejes
+  g.append('text')
+    .attr('x', innerW / 2).attr('y', innerH + 32)
+    .attr('text-anchor', 'middle').attr('fill', '#5a6a80').attr('font-size', '9px')
+    .text('Componente 1');
+  g.append('text')
+    .attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -38)
+    .attr('text-anchor', 'middle').attr('fill', '#5a6a80').attr('font-size', '9px')
+    .text('Componente 2');
+
+  // Puntos del scatter
+  const circles = g.selectAll('circle')
+    .data(points, d => d.match_id)
+    .enter().append('circle')
+    .attr('cx', d => xScale(d.x))
+    .attr('cy', d => yScale(d.y))
+    .attr('r', 3.5)
+    .attr('fill', d => colorInfo.fn(d))
+    .attr('opacity', 0.72)
+    .attr('stroke', 'none')
+    .attr('cursor', 'pointer')
+    .on('mouseover', function (event, d) {
+      latentState.hovered = d.match_id;
+      updateLatentHighlight();
+      showLatentTooltip(event, d);
+    })
+    .on('mouseout', function () {
+      latentState.hovered = null;
+      updateLatentHighlight();
+      hideLatentTooltip();
+    })
+    .on('click', function (event, d) {
+      event.stopPropagation();
+      selectLatentPoint(d.match_id);
+    });
+
+  // Leyenda categórica (Radiant / Dire)
+  if (colorInfo.type === 'categorical') {
+    const lgd = svg.append('g')
+      .attr('transform', `translate(${margin.left + 6},${margin.top + 4})`);
+    [['Radiant', '#5cbf8a'], ['Dire', '#bf5c5c']].forEach(([lbl, clr], i) => {
+      lgd.append('circle').attr('cx', 5).attr('cy', i * 17 + 5).attr('r', 4.5).attr('fill', clr);
+      lgd.append('text').attr('x', 14).attr('y', i * 17 + 9)
+        .attr('fill', '#8899aa').attr('font-size', '10px').text(lbl);
+    });
+  } else {
+    // Barra de gradiente continua
+    const defs = svg.append('defs');
+    const gId  = 'lg-' + containerId;
+    const grad = defs.append('linearGradient').attr('id', gId)
+      .attr('x1', '0%').attr('x2', '100%');
+    [0, 0.25, 0.5, 0.75, 1].forEach(t =>
+      grad.append('stop').attr('offset', `${t * 100}%`)
+        .attr('stop-color', d3.interpolateYlOrRd(t))
+    );
+    const lx = margin.left + innerW - 90;
+    const ly = H - 10;
+    svg.append('rect').attr('x', lx).attr('y', ly - 8).attr('width', 80).attr('height', 8)
+      .attr('fill', `url(#${gId})`).attr('rx', 2);
+    svg.append('text').attr('x', lx).attr('y', ly - 10)
+      .attr('fill', '#5a6a80').attr('font-size', '8px')
+      .text(colorInfo.min != null ? colorInfo.min.toFixed(2) : '');
+    svg.append('text').attr('x', lx + 80).attr('y', ly - 10)
+      .attr('text-anchor', 'end').attr('fill', '#5a6a80').attr('font-size', '8px')
+      .text(colorInfo.max != null ? colorInfo.max.toFixed(2) : '');
+  }
+
+  // Título del panel
+  svg.append('text').attr('x', margin.left).attr('y', 14)
+    .attr('fill', '#b8a060').attr('font-size', '10.5px').attr('font-weight', '700')
+    .text(panelTitle);
+
+  // Guardar referencia para actualizaciones sin re-render
+  latentCharts[containerId] = { circles };
+}
+
+// ─── Actualizar resaltado sin re-renderizar el SVG ────────────────────────────
+function updateLatentHighlight() {
+  ['latent-p1', 'latent-p3'].forEach(cid => {
+    const chart = latentCharts[cid];
+    if (!chart) return;
+    chart.circles
+      .attr('r', d => d.match_id === latentState.selected ? 7 : 3.5)
+      .attr('opacity', d => {
+        if (latentState.selected != null && d.match_id !== latentState.selected) return 0.15;
+        if (latentState.hovered  != null && d.match_id === latentState.hovered)  return 1;
+        return 0.72;
+      })
+      .attr('stroke', d =>
+        d.match_id === latentState.selected ? '#ffffff' :
+        d.match_id === latentState.hovered  ? 'rgba(255,255,255,.5)' : 'none'
+      )
+      .attr('stroke-width', d => d.match_id === latentState.selected ? 1.5 : 0.75);
+  });
+}
+
+// ─── Renderizar paneles de scatter ────────────────────────────────────────────
+function renderLatentP1() {
+  if (!latentState.data) return;
+  const colorInfo = getLatentColorFn(latentState.data.puntos, 'radiant_win');
+  renderLatentScatter('latent-p1', latentState.data.puntos, colorInfo,
+    `${latentState.data.meta.method.toUpperCase()} — Ganador`);
+  if (latentState.selected != null || latentState.hovered != null) updateLatentHighlight();
+}
+
+function renderLatentP3() {
+  if (!latentState.data) return;
+  const attrKey   = document.getElementById('latentColorAttr')?.value || 'win_pct_r';
+  const colorInfo = getLatentColorFn(latentState.data.puntos, attrKey);
+  const lbl       = LATENT_COLOR_ATTRS.find(a => a.key === attrKey)?.label || attrKey;
+  renderLatentScatter('latent-p3', latentState.data.puntos, colorInfo,
+    `${latentState.data.meta.method.toUpperCase()} — ${lbl}`);
+  if (latentState.selected != null || latentState.hovered != null) updateLatentHighlight();
+}
+
+// ─── Selección de un punto (enlaza P1 ↔ P2 ↔ P3 ↔ P4) ───────────────────────
+function selectLatentPoint(matchId) {
+  latentState.selected = (latentState.selected === matchId) ? null : matchId;
+  updateLatentHighlight();
+
+  if (latentState.selected != null) {
+    const spin = `<div style="display:flex;align-items:center;justify-content:center;
+                              height:360px"><div class="spinner-dota"></div></div>`;
+    document.getElementById('latent-p2').innerHTML = spin;
+    document.getElementById('latent-p4').innerHTML = spin;
+
+    fetch(`/api/partida/${latentState.selected}`)
+      .then(r => r.json())
+      .then(d => { renderLatentP2(d); renderLatentP4(d); })
+      .catch(() => {
+        document.getElementById('latent-p2').innerHTML =
+          `<div style="color:var(--dota-muted);padding:2rem;text-align:center">
+             Error al cargar los datos del punto
+           </div>`;
+      });
+  } else {
+    clearLatentP2();
+    clearLatentP4();
+  }
+}
+
+// ─── Limpiar paneles de detalle ───────────────────────────────────────────────
+function clearLatentP2() {
+  document.getElementById('latent-p2').innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;
+                 height:360px;color:var(--dota-muted);font-size:.85rem;
+                 text-align:center;padding:1rem">
+       Selecciona un punto en <strong>Panel 1</strong> o <strong>Panel 3</strong><br>
+       para comparar atributos Radiant vs Dire
+     </div>`;
+}
+
+function clearLatentP4() {
+  document.getElementById('latent-p4').innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;
+                 height:360px;color:var(--dota-muted);font-size:.85rem;
+                 text-align:center;padding:1rem">
+       Selecciona un punto<br>para ver el vector completo de atributos
+     </div>`;
+}
+
+// ─── Panel 2: Gráfico de barras D3 (Radiant vs Dire) ─────────────────────────
+function renderLatentP2(detalle) {
+  const container = document.getElementById('latent-p2');
+  container.innerHTML = '';
+
+  const stats  = detalle.radiant?.stats || {};
+  const statsD = detalle.dire?.stats    || {};
+
+  const SHOW_KEYS = [
+    'win_pct', 'kda_avg', 'gold_per_min_avg', 'xp_per_min_avg',
+    'hero_kills_avg', 'deaths_avg', 'assists_avg', 'tower_kills_avg',
+    'last_hits_avg', 'observer_uses_avg', 'sentry_uses_avg', 'roshan_kills_avg',
+    'gold_avg', 'level_avg',
+  ].filter(k => stats[k] != null || statsD[k] != null);
+
+  const W      = Math.max(container.clientWidth || 440, 300);
+  const BH     = 17;   // altura de cada barra individual
+  const GAP    = 5;    // espacio entre pares de barras
+  const margin = { top: 38, right: 14, bottom: 10, left: 148 };
+  const H      = margin.top + SHOW_KEYS.length * (BH * 2 + GAP + 4) + margin.bottom;
+  const innerW = W - margin.left - margin.right;
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', '100%').attr('height', H)
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  // Encabezado
+  const ganClr  = detalle.radiant_win ? '#5cbf8a' : '#bf5c5c';
+  const ganText = detalle.radiant_win ? 'Radiant' : 'Dire';
+  svg.append('text').attr('x', margin.left).attr('y', 16)
+    .attr('fill', '#e8b84b').attr('font-size', '11px').attr('font-weight', '700')
+    .text(`Match #${detalle.match_id}`);
+  svg.append('text').attr('x', margin.left + 96).attr('y', 16)
+    .attr('fill', ganClr).attr('font-size', '11px').attr('font-weight', '700')
+    .text(`— Gana ${ganText}`);
+
+  // Leyenda
+  const lgd = svg.append('g').attr('transform', `translate(${W - 96}, 4)`);
+  [['Radiant', '#5cbf8a'], ['Dire', '#bf5c5c']].forEach(([lbl, clr], i) => {
+    lgd.append('rect').attr('x', 0).attr('y', i * 14).attr('width', 10).attr('height', 10)
+      .attr('fill', clr).attr('rx', 2);
+    lgd.append('text').attr('x', 13).attr('y', i * 14 + 9)
+      .attr('fill', '#8899aa').attr('font-size', '10px').text(lbl);
+  });
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  SHOW_KEYS.forEach((k, idx) => {
+    const yBase = idx * (BH * 2 + GAP + 4);
+    const rVal  = stats[k]  ?? 0;
+    const dVal  = statsD[k] ?? 0;
+    const maxV  = Math.max(Math.abs(rVal), Math.abs(dVal), 1e-6);
+    const xS    = d3.scaleLinear().domain([0, maxV]).range([0, innerW * 0.72]);
+    const cfg   = STAT_CONFIG[k] || { label: k };
+
+    // Etiqueta del atributo
+    g.append('text').attr('x', -6).attr('y', yBase + BH - 4)
+      .attr('text-anchor', 'end').attr('fill', '#7a8ea8').attr('font-size', '8.5px')
+      .text((cfg.label || k).substring(0, 24));
+
+    // Barra Radiant
+    g.append('rect').attr('x', 0).attr('y', yBase)
+      .attr('width', xS(Math.abs(rVal))).attr('height', BH)
+      .attr('fill', '#5cbf8a').attr('opacity', 0.80).attr('rx', 2);
+    g.append('text').attr('x', xS(Math.abs(rVal)) + 3).attr('y', yBase + BH - 4)
+      .attr('fill', '#5cbf8a').attr('font-size', '8px').text(fmtStat(k, rVal));
+
+    // Barra Dire
+    g.append('rect').attr('x', 0).attr('y', yBase + BH + 2)
+      .attr('width', xS(Math.abs(dVal))).attr('height', BH)
+      .attr('fill', '#bf5c5c').attr('opacity', 0.80).attr('rx', 2);
+    g.append('text').attr('x', xS(Math.abs(dVal)) + 3).attr('y', yBase + BH * 2 - 2)
+      .attr('fill', '#bf5c5c').attr('font-size', '8px').text(fmtStat(k, dVal));
+  });
+}
+
+// ─── Panel 4: Tabla del vector de características ─────────────────────────────
+function renderLatentP4(detalle) {
+  const container = document.getElementById('latent-p4');
+  const stats     = detalle.radiant?.stats || {};
+  const statsD    = detalle.dire?.stats    || {};
+
+  const rows = Object.entries(STAT_CONFIG)
+    .filter(([k]) => stats[k] != null || statsD[k] != null)
+    .map(([k, cfg]) => ({
+      label: cfg.label,
+      r:     fmtStat(k, stats[k]),
+      d:     fmtStat(k, statsD[k]),
+    }));
+
+  container.innerHTML = `
+    <div style="padding:.7rem .85rem;width:100%">
+      <div style="font-size:.8rem;font-weight:700;color:#e8b84b;margin-bottom:.6rem">
+        Match <strong>#${detalle.match_id}</strong>
+        &nbsp;·&nbsp; ${(detalle.dt_match || '').substring(0, 10)}
+        &nbsp;·&nbsp; Gana
+        <span style="color:${detalle.radiant_win ? '#5cbf8a' : '#bf5c5c'}">
+          ${detalle.radiant_win ? 'Radiant' : 'Dire'}
+        </span>
+      </div>
+      <table style="width:100%;font-size:.73rem;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;color:var(--dota-muted);padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Atributo</th>
+            <th style="text-align:right;color:#5cbf8a;padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Radiant</th>
+            <th style="text-align:right;color:#bf5c5c;padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Dire</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid #181e2e">
+              <td style="color:#7a8ea8;padding:2px 6px">${r.label}</td>
+              <td style="text-align:right;color:#5cbf8a;padding:2px 6px">${r.r}</td>
+              <td style="text-align:right;color:#bf5c5c;padding:2px 6px">${r.d}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ─── Tooltip flotante ─────────────────────────────────────────────────────────
+function showLatentTooltip(event, d) {
+  if (!latentTooltipEl) {
+    latentTooltipEl = document.createElement('div');
+    latentTooltipEl.className = 'latent-tooltip';
+    document.body.appendChild(latentTooltipEl);
+  }
+  const gClr = d.radiant_win ? '#5cbf8a' : '#bf5c5c';
+  const gTxt = d.radiant_win ? 'Radiant' : 'Dire';
+  latentTooltipEl.innerHTML = `
+    <div style="font-weight:700;color:#e8b84b;margin-bottom:3px">Match #${d.match_id}</div>
+    <div>Ganador: <span style="color:${gClr}">${gTxt}</span></div>
+    <div>WR&nbsp;R: ${d.win_pct_r != null ? (d.win_pct_r * 100).toFixed(1) + '%' : '—'}
+         &nbsp;|&nbsp;D: ${d.win_pct_d != null ? (d.win_pct_d * 100).toFixed(1) + '%' : '—'}</div>
+    <div>KDA&nbsp;R: ${d.kda_avg_r != null ? d.kda_avg_r.toFixed(2) : '—'}</div>
+    <div style="color:#4a5a70;font-size:.7rem;margin-top:3px">Clic para ver detalle completo</div>`;
+  latentTooltipEl.style.display = 'block';
+  latentTooltipEl.style.left    = (event.clientX + 14) + 'px';
+  latentTooltipEl.style.top     = (event.clientY - 10) + 'px';
+}
+
+function hideLatentTooltip() {
+  if (latentTooltipEl) latentTooltipEl.style.display = 'none';
+}
