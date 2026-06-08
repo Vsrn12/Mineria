@@ -5,6 +5,34 @@ disputadas entre 2019 y mediados de 2021. Permite visualizar el meta de héroes,
 consultar estadísticas detalladas de cada partido, encontrar partidas similares
 usando el algoritmo **K-Nearest Neighbors (KNN)** y explorar gráficos analíticos.
 
+## Novedades
+
+- Espacio latente interactivo con soporte para **PCA**, **UMAP** y **t-SNE**.
+- Selección de puntos individual con **clic**, y selección múltiple con **Ctrl/Cmd + clic**.
+- Selección rectangular con **Shift + arrastre sobre el fondo** del gráfico.
+- Paneles laterales muestran el detalle de un punto o el promedio de la selección múltiple.
+- Opción de cargar **todas las muestras válidas** en el espacio latente si el dataset es completo.
+- Carga inicial acelerada usando **Polars** cuando está disponible.
+
+## Instalación rápida
+
+1. Crea un entorno virtual Python:
+   ```bash
+   python -m venv .venv
+   .\.venv\Scripts\activate
+   ```
+2. Instala dependencias:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Ejecuta la aplicación:
+   ```bash
+   python app.py
+   ```
+
+> Nota: `umap-learn` está en `requirements.txt`. Si no se instala por problemas con compiladores,
+> la aplicación seguirá funcionando y usará `PCA` en lugar de `UMAP`.
+
 ---
 
 ## Entendiendo el Dataset

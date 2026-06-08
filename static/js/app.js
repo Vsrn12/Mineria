@@ -1239,7 +1239,7 @@ cargarPartidas(1);
 // ─── Estado global ────────────────────────────────────────────────────────────
 const latentState = {
   data:     null,   // respuesta de /api/espacio-latente
-  selected: null,   // match_id seleccionado (null = ninguno)
+  selected: [],     // match_ids seleccionados
   hovered:  null,   // match_id bajo el cursor
 };
 const latentCharts    = {};   // { 'latent-p1': {circles}, 'latent-p3': {circles} }
@@ -1260,6 +1260,13 @@ const LATENT_COLOR_ATTRS = [
   { key: 'gold_per_min_avg_d', label: 'GPM Dire',                 type: 'continuous'  },
 ];
 
+const LATENT_DETAIL_STATS = [
+  'win_pct', 'kda_avg', 'gold_per_min_avg', 'xp_per_min_avg',
+  'hero_kills_avg', 'deaths_avg', 'assists_avg', 'tower_kills_avg',
+  'last_hits_avg', 'observer_uses_avg', 'sentry_uses_avg', 'roshan_kills_avg',
+  'gold_avg', 'level_avg'
+];
+
 // ─── Cargar datos desde el backend ────────────────────────────────────────────
 async function cargarEspacioLatente() {
   const method = document.getElementById('latentMethod').value;
@@ -1267,12 +1274,13 @@ async function cargarEspacioLatente() {
 
   document.getElementById('latentMeta').textContent = `Calculando ${method.toUpperCase()}…`;
 
+  const sampleLabel = n === 'all' ? 'todas las' : `${Number(n).toLocaleString()}`;
   const spinHtml = `
     <div style="display:flex;flex-direction:column;align-items:center;
                 justify-content:center;height:360px;gap:1rem">
       <div class="spinner-dota"></div>
       <span style="color:var(--dota-muted);font-size:.82rem">
-        ${method.toUpperCase()} — reduciendo ${Number(n).toLocaleString()} registros…
+        ${method.toUpperCase()} — reduciendo ${sampleLabel} registros…
       </span>
     </div>`;
   document.getElementById('latent-p1').innerHTML = spinHtml;
@@ -1285,14 +1293,18 @@ async function cargarEspacioLatente() {
     const data = await resp.json();
 
     latentState.data     = data;
-    latentState.selected = null;
+    latentState.selected = [];
     latentState.hovered  = null;
     delete latentCharts['latent-p1'];
     delete latentCharts['latent-p3'];
+    updateLatentSelectionInfo();
 
     // Texto informativo de metadatos
     const meta = data.meta;
     let metaText = `${meta.n_used.toLocaleString()} puntos · ${meta.method.toUpperCase()}`;
+    if (meta.truncated) {
+      metaText += ` · (mostrando un muestreo seguro de ${meta.max_allowed.toLocaleString()} partidas)`;
+    }
     if (meta.explained_variance) {
       const pct = ((meta.explained_variance[0] + meta.explained_variance[1]) * 100).toFixed(1);
       metaText += ` · varianza explicada PC1+PC2: ${pct}%`;
@@ -1386,6 +1398,77 @@ function renderLatentScatter(containerId, points, colorInfo, panelTitle) {
     .attr('text-anchor', 'middle').attr('fill', '#5a6a80').attr('font-size', '9px')
     .text('Componente 2');
 
+  // Área de fondo para detección de arrastre con Shift
+  const bg = g.append('rect')
+    .attr('x', 0).attr('y', 0)
+    .attr('width', innerW).attr('height', innerH)
+    .attr('fill', 'transparent')
+    .style('cursor', 'crosshair');
+
+  const selectionBox = g.append('rect')
+    .attr('fill', 'rgba(235, 236, 255, 0.15)')
+    .attr('stroke', 'rgba(235, 236, 255, 0.8)')
+    .attr('stroke-width', 1)
+    .style('display', 'none');
+
+  let origin = null;
+
+  function updateSelectionBox(x0, y0, x1, y1) {
+    const left = Math.min(x0, x1);
+    const top = Math.min(y0, y1);
+    const width = Math.abs(x1 - x0);
+    const height = Math.abs(y1 - y0);
+    selectionBox
+      .attr('x', left)
+      .attr('y', top)
+      .attr('width', width)
+      .attr('height', height)
+      .style('display', 'block');
+  }
+
+  function hideSelectionBox() {
+    selectionBox.style('display', 'none');
+    origin = null;
+  }
+
+  function endSelection(event) {
+    if (!origin) return;
+    const [x0, y0] = origin;
+    const [x1, y1] = d3.pointer(event, g.node());
+    const selectedIds = points
+      .filter(d => {
+        const px = xScale(d.x);
+        const py = yScale(d.y);
+        return px >= Math.min(x0, x1) && px <= Math.max(x0, x1) &&
+               py >= Math.min(y0, y1) && py <= Math.max(y0, y1);
+      })
+      .map(d => d.match_id);
+    if (selectedIds.length) {
+      setLatentSelection(selectedIds, true);
+    }
+    hideSelectionBox();
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+
+  function onMouseMove(event) {
+    if (!origin) return;
+    const [x, y] = d3.pointer(event, g.node());
+    updateSelectionBox(origin[0], origin[1], x, y);
+  }
+
+  function onMouseUp(event) {
+    endSelection(event);
+  }
+
+  bg.on('mousedown', function (event) {
+    if (!event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    origin = d3.pointer(event, g.node());
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+
   // Puntos del scatter
   const circles = g.selectAll('circle')
     .data(points, d => d.match_id)
@@ -1409,7 +1492,7 @@ function renderLatentScatter(containerId, points, colorInfo, panelTitle) {
     })
     .on('click', function (event, d) {
       event.stopPropagation();
-      selectLatentPoint(d.match_id);
+      selectLatentPoint(d.match_id, event);
     });
 
   // Leyenda categórica (Radiant / Dire)
@@ -1453,22 +1536,27 @@ function renderLatentScatter(containerId, points, colorInfo, panelTitle) {
 }
 
 // ─── Actualizar resaltado sin re-renderizar el SVG ────────────────────────────
+function isLatentSelected(matchId) {
+  return latentState.selected && latentState.selected.includes(matchId);
+}
+
 function updateLatentHighlight() {
+  const hasSelection = Array.isArray(latentState.selected) && latentState.selected.length > 0;
   ['latent-p1', 'latent-p3'].forEach(cid => {
     const chart = latentCharts[cid];
     if (!chart) return;
     chart.circles
-      .attr('r', d => d.match_id === latentState.selected ? 7 : 3.5)
+      .attr('r', d => isLatentSelected(d.match_id) ? 7 : 3.5)
       .attr('opacity', d => {
-        if (latentState.selected != null && d.match_id !== latentState.selected) return 0.15;
-        if (latentState.hovered  != null && d.match_id === latentState.hovered)  return 1;
+        if (hasSelection && !isLatentSelected(d.match_id)) return 0.15;
+        if (latentState.hovered != null && d.match_id === latentState.hovered) return 1;
         return 0.72;
       })
       .attr('stroke', d =>
-        d.match_id === latentState.selected ? '#ffffff' :
-        d.match_id === latentState.hovered  ? 'rgba(255,255,255,.5)' : 'none'
+        isLatentSelected(d.match_id) ? '#ffffff' :
+        d.match_id === latentState.hovered ? 'rgba(255,255,255,.5)' : 'none'
       )
-      .attr('stroke-width', d => d.match_id === latentState.selected ? 1.5 : 0.75);
+      .attr('stroke-width', d => isLatentSelected(d.match_id) ? 1.5 : 0.75);
   });
 }
 
@@ -1478,7 +1566,7 @@ function renderLatentP1() {
   const colorInfo = getLatentColorFn(latentState.data.puntos, 'radiant_win');
   renderLatentScatter('latent-p1', latentState.data.puntos, colorInfo,
     `${latentState.data.meta.method.toUpperCase()} — Ganador`);
-  if (latentState.selected != null || latentState.hovered != null) updateLatentHighlight();
+  updateLatentHighlight();
 }
 
 function renderLatentP3() {
@@ -1488,32 +1576,24 @@ function renderLatentP3() {
   const lbl       = LATENT_COLOR_ATTRS.find(a => a.key === attrKey)?.label || attrKey;
   renderLatentScatter('latent-p3', latentState.data.puntos, colorInfo,
     `${latentState.data.meta.method.toUpperCase()} — ${lbl}`);
-  if (latentState.selected != null || latentState.hovered != null) updateLatentHighlight();
+  updateLatentHighlight();
 }
 
 // ─── Selección de un punto (enlaza P1 ↔ P2 ↔ P3 ↔ P4) ───────────────────────
-function selectLatentPoint(matchId) {
-  latentState.selected = (latentState.selected === matchId) ? null : matchId;
-  updateLatentHighlight();
-
-  if (latentState.selected != null) {
-    const spin = `<div style="display:flex;align-items:center;justify-content:center;
-                              height:360px"><div class="spinner-dota"></div></div>`;
-    document.getElementById('latent-p2').innerHTML = spin;
-    document.getElementById('latent-p4').innerHTML = spin;
-
-    fetch(`/api/partida/${latentState.selected}`)
-      .then(r => r.json())
-      .then(d => { renderLatentP2(d); renderLatentP4(d); })
-      .catch(() => {
-        document.getElementById('latent-p2').innerHTML =
-          `<div style="color:var(--dota-muted);padding:2rem;text-align:center">
-             Error al cargar los datos del punto
-           </div>`;
-      });
+function selectLatentPoint(matchId, event) {
+  const append = event && (event.ctrlKey || event.metaKey);
+  if (append) {
+    if (isLatentSelected(matchId)) {
+      setLatentSelection(latentState.selected.filter(id => id !== matchId), false);
+    } else {
+      setLatentSelection([matchId], true);
+    }
   } else {
-    clearLatentP2();
-    clearLatentP4();
+    if (latentState.selected.length === 1 && isLatentSelected(matchId)) {
+      clearLatentSelection();
+      return;
+    }
+    setLatentSelection([matchId], false);
   }
 }
 
@@ -1535,6 +1615,182 @@ function clearLatentP4() {
                  text-align:center;padding:1rem">
        Selecciona un punto<br>para ver el vector completo de atributos
      </div>`;
+}
+
+function updateLatentSelectionInfo() {
+  const info = document.getElementById('latentSelectionInfo');
+  if (!info) return;
+  const count = latentState.selected.length;
+  if (count === 0) {
+    info.textContent = 'Sin selección. Usa Ctrl/Cmd + clic o Shift + arrastra para seleccionar varios puntos.';
+  } else if (count === 1) {
+    info.textContent = '1 punto seleccionado. Ctrl/Cmd + clic para agregar/quitar puntos.';
+  } else {
+    info.textContent = `${count} puntos seleccionados. Los paneles muestran el promedio de la selección.`;
+  }
+}
+
+function setLatentSelection(ids, append = false) {
+  if (!Array.isArray(ids)) ids = [ids];
+  if (append) {
+    latentState.selected = Array.from(new Set([...(latentState.selected || []), ...ids]));
+  } else {
+    latentState.selected = ids.slice();
+  }
+  updateLatentSelectionInfo();
+  updateLatentHighlight();
+  renderLatentDetails();
+}
+
+function clearLatentSelection() {
+  latentState.selected = [];
+  updateLatentSelectionInfo();
+  updateLatentHighlight();
+  clearLatentP2();
+  clearLatentP4();
+}
+
+function renderLatentDetails() {
+  if (!latentState.selected || latentState.selected.length === 0) {
+    clearLatentP2();
+    clearLatentP4();
+    return;
+  }
+
+  if (latentState.selected.length === 1) {
+    const id = latentState.selected[0];
+    const spin = `<div style="display:flex;align-items:center;justify-content:center;
+                              height:360px"><div class="spinner-dota"></div></div>`;
+    document.getElementById('latent-p2').innerHTML = spin;
+    document.getElementById('latent-p4').innerHTML = spin;
+
+    fetch(`/api/partida/${id}`)
+      .then(r => r.json())
+      .then(d => { renderLatentP2(d); renderLatentP4(d); })
+      .catch(() => {
+        document.getElementById('latent-p2').innerHTML =
+          `<div style="color:var(--dota-muted);padding:2rem;text-align:center">
+             Error al cargar los datos del punto
+           </div>`;
+      });
+  } else {
+    renderLatentP2Multi();
+    renderLatentP4Multi();
+  }
+}
+
+function renderLatentP2Multi() {
+  const container = document.getElementById('latent-p2');
+  container.innerHTML = '';
+  container.style.display = 'block';
+  const points = latentState.data.puntos.filter(d => latentState.selected.includes(d.match_id));
+  const count = points.length;
+  const radiantWins = points.filter(d => d.radiant_win).length;
+
+  const statsR = {};
+  const statsD = {};
+  LATENT_DETAIL_STATS.forEach(key => {
+    const rvals = points.map(d => d[`${key}_r`]).filter(v => v != null);
+    const dvals = points.map(d => d[`${key}_d`]).filter(v => v != null);
+    statsR[key] = rvals.length ? d3.mean(rvals) : null;
+    statsD[key] = dvals.length ? d3.mean(dvals) : null;
+  });
+
+  const W      = Math.max(container.clientWidth || 440, 300);
+  const BH     = 17;
+  const GAP    = 5;
+  const margin = { top: 62, right: 14, bottom: 10, left: 148 };
+  const H      = margin.top + LATENT_DETAIL_STATS.length * (BH * 2 + GAP + 4) + margin.bottom;
+  const innerW = W - margin.left - margin.right;
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', '100%').attr('height', H)
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  svg.append('text').attr('x', margin.left).attr('y', 16)
+    .attr('fill', '#e8b84b').attr('font-size', '11px').attr('font-weight', '700')
+    .text(`Selección múltiple · ${count} puntos`);
+  svg.append('text').attr('x', margin.left).attr('y', 32)
+    .attr('fill', '#8899aa').attr('font-size', '10px')
+    .text(`Radiant gana ${radiantWins} / ${count} partidas (${count ? ((radiantWins / count) * 100).toFixed(1) : '0'}%)`);
+
+  const legend = svg.append('g').attr('transform', `translate(${W - 130}, 6)`);
+  [['Radiant', '#5cbf8a'], ['Dire', '#bf5c5c']].forEach(([lbl, clr], i) => {
+    legend.append('rect').attr('x', 0).attr('y', i * 14).attr('width', 10).attr('height', 10)
+      .attr('fill', clr).attr('rx', 2);
+    legend.append('text').attr('x', 13).attr('y', i * 14 + 9)
+      .attr('fill', '#8899aa').attr('font-size', '10px').text(lbl);
+  });
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  LATENT_DETAIL_STATS.forEach((key, idx) => {
+    const yBase = idx * (BH * 2 + GAP + 4);
+    const rVal  = statsR[key] != null ? statsR[key] : null;
+    const dVal  = statsD[key] != null ? statsD[key] : null;
+    const maxV  = Math.max(Math.abs(rVal || 0), Math.abs(dVal || 0), 1e-6);
+    const xS    = d3.scaleLinear().domain([0, maxV]).range([0, innerW * 0.72]);
+    const cfg   = STAT_CONFIG[key] || { label: key };
+
+    g.append('text').attr('x', -6).attr('y', yBase + BH - 4)
+      .attr('text-anchor', 'end').attr('fill', '#7a8ea8').attr('font-size', '8.5px')
+      .text((cfg.label || key).substring(0, 24));
+
+    g.append('rect').attr('x', 0).attr('y', yBase)
+      .attr('width', xS(Math.abs(rVal))).attr('height', BH)
+      .attr('fill', '#5cbf8a').attr('opacity', 0.80).attr('rx', 2);
+    g.append('text').attr('x', xS(Math.abs(rVal)) + 3).attr('y', yBase + BH - 4)
+      .attr('fill', '#5cbf8a').attr('font-size', '8px').text(fmtStat(key, rVal));
+
+    g.append('rect').attr('x', 0).attr('y', yBase + BH + 2)
+      .attr('width', xS(Math.abs(dVal))).attr('height', BH)
+      .attr('fill', '#bf5c5c').attr('opacity', 0.80).attr('rx', 2);
+    g.append('text').attr('x', xS(Math.abs(dVal)) + 3).attr('y', yBase + BH * 2 - 2)
+      .attr('fill', '#bf5c5c').attr('font-size', '8px').text(fmtStat(key, dVal));
+  });
+}
+
+function renderLatentP4Multi() {
+  const container = document.getElementById('latent-p4');
+  const points = latentState.data.puntos.filter(d => latentState.selected.includes(d.match_id));
+  const count = points.length;
+  const rows = LATENT_DETAIL_STATS.map(key => {
+    const rvals = points.map(d => d[`${key}_r`]).filter(v => v != null);
+    const dvals = points.map(d => d[`${key}_d`]).filter(v => v != null);
+    return {
+      label: STAT_CONFIG[key]?.label || key,
+      r: fmtStat(key, rvals.length ? d3.mean(rvals) : null),
+      d: fmtStat(key, dvals.length ? d3.mean(dvals) : null),
+    };
+  });
+
+  container.innerHTML = `
+    <div style="padding:.7rem .85rem;width:100%">
+      <div style="font-size:.8rem;font-weight:700;color:#e8b84b;margin-bottom:.6rem">
+        Selección múltiple · ${count} puntos
+      </div>
+      <table style="width:100%;font-size:.73rem;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;color:var(--dota-muted);padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Atributo</th>
+            <th style="text-align:right;color:#5cbf8a;padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Radiant</th>
+            <th style="text-align:right;color:#bf5c5c;padding:3px 6px;
+                       border-bottom:1px solid #232d3f;font-weight:600">Dire</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid #181e2e">
+              <td style="color:#7a8ea8;padding:2px 6px">${r.label}</td>
+              <td style="text-align:right;color:#5cbf8a;padding:2px 6px">${r.r}</td>
+              <td style="text-align:right;color:#bf5c5c;padding:2px 6px">${r.d}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 // ─── Panel 2: Gráfico de barras D3 (Radiant vs Dire) ─────────────────────────

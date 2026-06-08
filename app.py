@@ -23,11 +23,18 @@ try:
 except ImportError:
     UMAP_AVAILABLE = False
 
+try:
+    import polars as pl
+    POLARS_AVAILABLE = True
+except ImportError:
+    POLARS_AVAILABLE = False
+
 app = Flask(__name__)
 
 # ─── Rutas ───────────────────────────────────────────────────────────────────
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH  = os.path.join(BASE_DIR, "tb_pro_players_matches.csv")
+MAX_LATENT_SAMPLES = 5000
 
 # ─── Estado global ────────────────────────────────────────────────────────────
 df_raw        = None   # DataFrame completo
@@ -80,14 +87,39 @@ def cargar_datos():
     global df_raw, knn_model, knn_matrix, knn_cols, scaler, load_time_ms, anomaly_stats
 
     t0 = time.perf_counter()
-    df = pd.read_csv(CSV_PATH)
+
+    if POLARS_AVAILABLE:
+        pl_df = pl.read_csv(CSV_PATH, null_values=["", "NaN"])
+        hero_cols_r_ids = [c for c in pl_df.columns if c.startswith("hero_") and c.endswith("_avg_r") and es_col_heroe(c)]
+        hero_cols_d_ids = [c for c in pl_df.columns if c.startswith("hero_") and c.endswith("_avg_d") and es_col_heroe(c)]
+        pl_df = pl_df.with_columns([
+            pl.any_horizontal([
+                pl.col(c).cast(pl.Float64).fill_null(0) > 0
+                for c in hero_cols_r_ids
+            ]).alias("_has_heroes_r"),
+            pl.any_horizontal([
+                pl.col(c).cast(pl.Float64).fill_null(0) > 0
+                for c in hero_cols_d_ids
+            ]).alias("_has_heroes_d"),
+        ])
+        pl_df = pl_df.with_columns((pl.col("_has_heroes_r") & pl.col("_has_heroes_d")).alias("_has_heroes"))
+        try:
+            df = pl_df.to_pandas()
+        except ModuleNotFoundError as exc:
+            if "pyarrow" in str(exc):
+                df = pd.DataFrame(pl_df.to_dicts())
+            else:
+                raise
+    else:
+        df = pd.read_csv(CSV_PATH)
 
     # ── Flags de presencia de héroes (calculados una sola vez) ──────────────
     hero_cols_r_ids = [c for c in df.columns if c.startswith("hero_") and c.endswith("_avg_r") and es_col_heroe(c)]
     hero_cols_d_ids = [c for c in df.columns if c.startswith("hero_") and c.endswith("_avg_d") and es_col_heroe(c)]
-    df["_has_heroes_r"] = (df[hero_cols_r_ids].fillna(0) > 0).any(axis=1)
-    df["_has_heroes_d"] = (df[hero_cols_d_ids].fillna(0) > 0).any(axis=1)
-    df["_has_heroes"]   = df["_has_heroes_r"] & df["_has_heroes_d"]
+    if not POLARS_AVAILABLE:
+        df["_has_heroes_r"] = (df[hero_cols_r_ids].fillna(0) > 0).any(axis=1)
+        df["_has_heroes_d"] = (df[hero_cols_d_ids].fillna(0) > 0).any(axis=1)
+        df["_has_heroes"]   = df["_has_heroes_r"] & df["_has_heroes_d"]
 
     # ── Estadísticas de anomalías (partidas sin datos de héroes) ────────────
     n_valid            = int(df["_has_heroes"].sum())
@@ -766,13 +798,26 @@ def api_espacio_latente():
     Proyecta el vector de características de cada partida a 2 dimensiones
     usando reducción de dimensionalidad (PCA, UMAP o t-SNE).
     Query params:
-        method : 'pca' | 'umap' | 'tsne'  (default: 'pca')
-        n      : número de muestras        (default: 1000, máx: 3000)
+            method : 'pca' | 'umap' | 'tsne'  (default: 'pca')
+        n      : número de muestras        (default: 1000, 'all' = todas las muestras válidas)
     """
-    method    = request.args.get("method", "pca").lower()
-    n_samples = min(int(request.args.get("n", 1000)), 3000)
+    method      = request.args.get("method", "pca").lower()
+    n_param     = request.args.get("n", "1000").lower()
+    df_v        = df_raw[df_raw["_has_heroes"] == True].copy()
+    requested_n = None
 
-    df_v = df_raw[df_raw["_has_heroes"] == True].copy()
+    if n_param in ("all", "todos", "0"):
+        requested_n = len(df_v)
+    else:
+        try:
+            requested_n = int(n_param)
+        except ValueError:
+            requested_n = 1000
+        requested_n = max(1, min(requested_n, len(df_v)))
+
+    n_samples = min(requested_n, MAX_LATENT_SAMPLES)
+    truncated = requested_n > n_samples
+
     if len(df_v) > n_samples:
         df_v = df_v.sample(n=n_samples, random_state=42)
 
@@ -809,9 +854,13 @@ def api_espacio_latente():
     # Columnas adicionales a incluir en cada punto para el frontend
     DETAIL_COLS = [
         "win_pct_r", "kda_avg_r", "gold_per_min_avg_r", "xp_per_min_avg_r",
-        "hero_kills_avg_r", "deaths_avg_r", "tower_kills_avg_r",
+        "hero_kills_avg_r", "deaths_avg_r", "tower_kills_avg_r", "assists_avg_r",
+        "last_hits_avg_r", "observer_uses_avg_r", "sentry_uses_avg_r",
+        "roshan_kills_avg_r", "gold_avg_r", "level_avg_r",
         "win_pct_d", "kda_avg_d", "gold_per_min_avg_d", "xp_per_min_avg_d",
-        "hero_kills_avg_d", "deaths_avg_d", "tower_kills_avg_d",
+        "hero_kills_avg_d", "deaths_avg_d", "tower_kills_avg_d", "assists_avg_d",
+        "last_hits_avg_d", "observer_uses_avg_d", "sentry_uses_avg_d",
+        "roshan_kills_avg_d", "gold_avg_d", "level_avg_d",
     ]
     detail_cols_ok = [c for c in DETAIL_COLS if c in df_v.columns]
 
@@ -835,6 +884,9 @@ def api_espacio_latente():
             "method_requested": method,
             "umap_available":   UMAP_AVAILABLE,
             "n_used":           len(puntos),
+            "n_requested":      requested_n,
+            "max_allowed":      MAX_LATENT_SAMPLES,
+            "truncated":        truncated,
             **extra,
         },
     })

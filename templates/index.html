@@ -469,6 +469,8 @@
           <option value="500">500</option>
           <option value="1000" selected>1 000</option>
           <option value="2000">2 000</option>
+          <option value="5000">5 000</option>
+          <option value="all">Todas</option>
         </select>
       </div>
 
@@ -491,13 +493,18 @@
       <button class="btn-dota" onclick="cargarEspacioLatente()">
         <i class="bi bi-cpu"></i> Calcular
       </button>
+      <button class="btn-dota btn-sm" onclick="clearLatentSelection()" style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12);">
+        <i class="bi bi-x-lg"></i> Limpiar selección
+      </button>
       <span id="latentMeta" style="color:var(--dota-muted);font-size:.78rem"></span>
+      <span id="latentSelectionInfo" style="color:var(--dota-muted);font-size:.78rem"></span>
     </div>
 
     <div style="margin-top:.55rem;font-size:.75rem;color:var(--dota-muted)">
       Aplica reducción de dimensionalidad sobre el vector de ~60 características por partida
       y proyecta cada registro a una posición <strong style="color:var(--dota-text)">(x, y)</strong> en 2D.
-      Haz clic en un punto para ver sus atributos en los paneles de la derecha.
+      Haz clic en un punto para seleccionarlo. Usa <strong>Ctrl/Cmd + clic</strong> para seleccionar varios puntos.
+      Si quieres seleccionar un grupo mayor, mantén <strong>Shift</strong> y arrastra sobre el fondo del gráfico.
       La selección se sincroniza entre
       <strong style="color:var(--dota-text)">Panel 1</strong> y
       <strong style="color:var(--dota-text)">Panel 3</strong>.
