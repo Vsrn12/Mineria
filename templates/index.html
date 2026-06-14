@@ -458,8 +458,9 @@
         <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">Método:</label>
         <select id="latentMethod" class="form-select-dota" style="width:110px">
           <option value="pca" selected>PCA</option>
-          <option value="umap">UMAP</option>
           <option value="tsne">t-SNE</option>
+          <option value="umap">UMAP</option>
+          <option value="mds">MDS</option>
         </select>
       </div>
 
@@ -511,11 +512,11 @@
     </div>
   </div>
 
-  <!-- Cuadrícula 2×2 -->
+  <!-- Cuadrícula 3×2: Scatter (1+3) | Histograma (5) + Paralelas (6) | Barras (2) + Tabla (4) -->
   <div class="row g-3">
 
     <!-- Panel 1: Espacio latente — color = ganador -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xl-4">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-bounding-box-circles" style="color:var(--dota-gold)"></i>
@@ -531,8 +532,46 @@
       </div>
     </div>
 
+    <!-- Panel 5: Histograma del atributo seleccionado -->
+    <div class="col-12 col-xl-4">
+      <div class="card-dota">
+        <div class="card-header-dota">
+          <i class="bi bi-bar-chart-fill" style="color:var(--dota-gold)"></i>
+          Panel 5 — Histograma de Atributo
+          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
+            Distribución de la selección
+          </span>
+        </div>
+        <div id="latent-p5"
+             style="min-height:360px;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">
+            Selecciona puntos para ver<br>la distribución del atributo
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 6: Coordenadas paralelas -->
+    <div class="col-12 col-xl-4">
+      <div class="card-dota">
+        <div class="card-header-dota">
+          <i class="bi bi-diagram-3" style="color:var(--dota-gold)"></i>
+          Panel 6 — Coordenadas Paralelas
+          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
+            Perfil multidimensional
+          </span>
+        </div>
+        <div id="latent-p6"
+             style="min-height:360px;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">
+            Selecciona puntos para ver<br>el perfil en coordenadas paralelas
+          </span>
+        </div>
+      </div>
+    </div>
+
     <!-- Panel 2: Atributos del punto seleccionado -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xl-4">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-bar-chart-horizontal-fill" style="color:var(--dota-gold)"></i>
@@ -549,7 +588,7 @@
     </div>
 
     <!-- Panel 3: Espacio latente — color = atributo elegido -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xl-4">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-palette-fill" style="color:var(--dota-gold)"></i>
@@ -566,7 +605,7 @@
     </div>
 
     <!-- Panel 4: Vector completo de atributos -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xl-4">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-table" style="color:var(--dota-gold)"></i>

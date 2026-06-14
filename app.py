@@ -15,7 +15,7 @@ from flask import Flask, jsonify, request, render_template
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+from sklearn.manifold import TSNE, MDS
 import inspect as _inspect
 try:
     import umap as umap_lib
@@ -836,6 +836,13 @@ def api_espacio_latente():
         reducer = TSNE(n_components=2, random_state=42, perplexity=perp,
                        **{iter_kwarg: 300})
         X2 = reducer.fit_transform(X_scaled)
+        extra["perplexity"] = perp
+
+    elif method == "mds":
+        reducer = MDS(n_components=2, random_state=42,
+                      metric=True, max_iter=300, normalized_stress='auto')
+        X2 = reducer.fit_transform(X_scaled)
+        extra["stress"] = round(float(reducer.stress_), 4)
 
     elif method == "umap" and UMAP_AVAILABLE:
         reducer = umap_lib.UMAP(n_components=2, random_state=42,
@@ -850,6 +857,8 @@ def api_espacio_latente():
         extra["explained_variance"] = [
             round(float(v), 4) for v in pca.explained_variance_ratio_
         ]
+        extra["cumulative_variance"] = round(
+            float(sum(pca.explained_variance_ratio_)) * 100, 1)
 
     # Columnas adicionales a incluir en cada punto para el frontend
     DETAIL_COLS = [

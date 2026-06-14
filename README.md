@@ -19,6 +19,7 @@ usando el algoritmo **K-Nearest Neighbors (KNN)** y explorar gráficos analític
 1. Crea un entorno virtual Python:
    ```bash
    python -m venv .venv
+   Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
    .\.venv\Scripts\activate
    ```
 2. Instala dependencias:
