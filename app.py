@@ -15,7 +15,8 @@ from flask import Flask, jsonify, request, render_template
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE, MDS
+from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans, DBSCAN
 import inspect as _inspect
 try:
     import umap as umap_lib
@@ -825,8 +826,29 @@ def api_espacio_latente():
     X        = df_v[knn_cols].values
     X_scaled = scaler.transform(X)
 
+    cluster_method = request.args.get("cluster_method", "kmeans").lower()
+    try:
+        cluster_k = int(request.args.get("cluster_k", 4))
+    except (TypeError, ValueError):
+        cluster_k = 4
+    try:
+        cluster_eps = float(request.args.get("cluster_eps", 0.8))
+    except (TypeError, ValueError):
+        cluster_eps = 0.8
+    try:
+        cluster_min_samples = int(request.args.get("cluster_min_samples", 5))
+    except (TypeError, ValueError):
+        cluster_min_samples = 5
+
     method_used = method
-    extra       = {}
+    extra       = {
+        "cluster_method":       cluster_method,
+        "cluster_k":            cluster_k,
+        "cluster_eps":          cluster_eps,
+        "cluster_min_samples":  cluster_min_samples,
+        "feature_count":        len(knn_cols),
+        "features_used":        knn_cols,
+    }
 
     if method == "tsne":
         perp = min(30, len(df_v) - 1)
@@ -836,13 +858,6 @@ def api_espacio_latente():
         reducer = TSNE(n_components=2, random_state=42, perplexity=perp,
                        **{iter_kwarg: 300})
         X2 = reducer.fit_transform(X_scaled)
-        extra["perplexity"] = perp
-
-    elif method == "mds":
-        reducer = MDS(n_components=2, random_state=42,
-                      metric=True, max_iter=300, normalized_stress='auto')
-        X2 = reducer.fit_transform(X_scaled)
-        extra["stress"] = round(float(reducer.stress_), 4)
 
     elif method == "umap" and UMAP_AVAILABLE:
         reducer = umap_lib.UMAP(n_components=2, random_state=42,
@@ -857,8 +872,22 @@ def api_espacio_latente():
         extra["explained_variance"] = [
             round(float(v), 4) for v in pca.explained_variance_ratio_
         ]
-        extra["cumulative_variance"] = round(
-            float(sum(pca.explained_variance_ratio_)) * 100, 1)
+
+    # Clustering sobre los puntos proyectados en 2D
+    cluster_labels = None
+    if cluster_method == "dbscan":
+        clusterer = DBSCAN(eps=cluster_eps, min_samples=cluster_min_samples)
+        cluster_labels = clusterer.fit_predict(X2)
+        extra["cluster_count"] = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    else:
+        cluster_k = min(max(1, cluster_k), len(df_v))
+        clusterer = KMeans(n_clusters=cluster_k, random_state=42)
+        cluster_labels = clusterer.fit_predict(X2)
+        extra["cluster_count"] = len(set(cluster_labels))
+        extra["cluster_centers"] = [
+            {"x": float(c[0]), "y": float(c[1]), "cluster": int(i)}
+            for i, c in enumerate(clusterer.cluster_centers_)
+        ]
 
     # Columnas adicionales a incluir en cada punto para el frontend
     DETAIL_COLS = [
@@ -880,6 +909,7 @@ def api_espacio_latente():
             "x":           round(float(X2[i, 0]), 4),
             "y":           round(float(X2[i, 1]), 4),
             "radiant_win": bool(row["radiant_win"]),
+            "cluster":     int(cluster_labels[i]) if cluster_labels is not None else None,
         }
         for col in detail_cols_ok:
             v = row[col]

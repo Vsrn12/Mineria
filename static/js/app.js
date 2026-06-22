@@ -1248,6 +1248,7 @@ let   latentTooltipEl = null; // elemento DOM del tooltip flotante
 // Atributos disponibles para colorear el Panel 3
 const LATENT_COLOR_ATTRS = [
   { key: 'radiant_win',        label: 'Ganador (Radiant/Dire)',   type: 'categorical' },
+  { key: 'cluster',            label: 'Clusters 2D',              type: 'categorical' },
   { key: 'win_pct_r',          label: 'Win Rate Radiant',         type: 'continuous'  },
   { key: 'kda_avg_r',          label: 'KDA Radiant',              type: 'continuous'  },
   { key: 'gold_per_min_avg_r', label: 'GPM Radiant',              type: 'continuous'  },
@@ -1271,6 +1272,10 @@ const LATENT_DETAIL_STATS = [
 async function cargarEspacioLatente() {
   const method = document.getElementById('latentMethod').value;
   const n      = document.getElementById('latentN').value;
+  const clusterMethod = document.getElementById('latentClusterMethod').value;
+  const clusterK = document.getElementById('latentClusterK').value;
+  const clusterEps = document.getElementById('latentClusterEps').value;
+  const clusterMinSamples = document.getElementById('latentClusterMinSamples').value;
 
   document.getElementById('latentMeta').textContent = `Calculando ${method.toUpperCase()}…`;
 
@@ -1289,7 +1294,9 @@ async function cargarEspacioLatente() {
   clearLatentP4();
 
   try {
-    const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}`);
+    const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}` +
+      `&cluster_method=${clusterMethod}&cluster_k=${clusterK}` +
+      `&cluster_eps=${clusterEps}&cluster_min_samples=${clusterMinSamples}`);
     const data = await resp.json();
 
     latentState.data     = data;
@@ -1306,14 +1313,19 @@ async function cargarEspacioLatente() {
       metaText += ` · (mostrando un muestreo seguro de ${meta.max_allowed.toLocaleString()} partidas)`;
     }
     if (meta.explained_variance) {
-      const pct = meta.cumulative_variance || ((meta.explained_variance[0] + meta.explained_variance[1]) * 100).toFixed(1);
+      const pct = ((meta.explained_variance[0] + meta.explained_variance[1]) * 100).toFixed(1);
       metaText += ` · varianza explicada PC1+PC2: ${pct}%`;
     }
-    if (meta.perplexity != null) {
-      metaText += ` · perplexity: ${meta.perplexity}`;
-    }
-    if (meta.stress != null) {
-      metaText += ` · stress: ${meta.stress}`;
+    if (meta.cluster_method) {
+      metaText += ` · clustering: ${meta.cluster_method.toUpperCase()}`;
+      if (meta.cluster_method === 'kmeans') {
+        metaText += ` (${meta.cluster_k} clusters)`;
+      } else if (meta.cluster_method === 'dbscan') {
+        metaText += ` (eps=${meta.cluster_eps}, minPts=${meta.cluster_min_samples})`;
+      }
+      if (typeof meta.cluster_count === 'number') {
+        metaText += ` · clusters detectados: ${meta.cluster_count}`;
+      }
     }
     if (meta.method_requested !== meta.method) {
       metaText += ' (UMAP no disponible → usando PCA)';
@@ -1334,12 +1346,31 @@ async function cargarEspacioLatente() {
 // ─── Función de color para los puntos ─────────────────────────────────────────
 function getLatentColorFn(points, attrKey) {
   const attr = LATENT_COLOR_ATTRS.find(a => a.key === attrKey);
-  if (!attr || attr.type === 'categorical') {
+  if (!attr) {
     return { fn: d => d.radiant_win ? '#5cbf8a' : '#bf5c5c', type: 'categorical' };
   }
-  const vals        = points.map(d => d[attrKey]).filter(v => v != null);
-  const [mn, mx]    = d3.extent(vals);
-  const cScale      = d3.scaleSequential(d3.interpolateYlOrRd).domain([mn, mx]);
+  if (attr.type === 'categorical') {
+    if (attrKey === 'cluster') {
+      const labels = Array.from(new Set(points.map(d => d.cluster).filter(v => v != null))).sort((a, b) => a - b);
+      const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(labels);
+      return {
+        fn: d => d.cluster != null ? colorScale(d.cluster) : '#2a3040',
+        type: 'categorical',
+        labels: labels.map(v => ({ label: v === -1 ? 'Ruido' : `Cluster ${v}`, color: colorScale(v) })),
+      };
+    }
+    return {
+      fn: d => d.radiant_win ? '#5cbf8a' : '#bf5c5c',
+      type: 'categorical',
+      labels: [
+        { label: 'Radiant', color: '#5cbf8a' },
+        { label: 'Dire',    color: '#bf5c5c' },
+      ],
+    };
+  }
+  const vals     = points.map(d => d[attrKey]).filter(v => v != null);
+  const [mn, mx] = d3.extent(vals);
+  const cScale   = d3.scaleSequential(d3.interpolateYlOrRd).domain([mn, mx]);
   return {
     fn:    d => d[attrKey] != null ? cScale(d[attrKey]) : '#2a3040',
     type:  'continuous',
@@ -1501,14 +1532,18 @@ function renderLatentScatter(containerId, points, colorInfo, panelTitle) {
       selectLatentPoint(d.match_id, event);
     });
 
-  // Leyenda categórica (Radiant / Dire)
+  // Leyenda categórica
   if (colorInfo.type === 'categorical') {
+    const labels = colorInfo.labels || [
+      { label: 'Radiant', color: '#5cbf8a' },
+      { label: 'Dire',    color: '#bf5c5c' },
+    ];
     const lgd = svg.append('g')
       .attr('transform', `translate(${margin.left + 6},${margin.top + 4})`);
-    [['Radiant', '#5cbf8a'], ['Dire', '#bf5c5c']].forEach(([lbl, clr], i) => {
-      lgd.append('circle').attr('cx', 5).attr('cy', i * 17 + 5).attr('r', 4.5).attr('fill', clr);
+    labels.forEach(({ label, color }, i) => {
+      lgd.append('circle').attr('cx', 5).attr('cy', i * 17 + 5).attr('r', 4.5).attr('fill', color);
       lgd.append('text').attr('x', 14).attr('y', i * 17 + 9)
-        .attr('fill', '#8899aa').attr('font-size', '10px').text(lbl);
+        .attr('fill', '#8899aa').attr('font-size', '10px').text(label);
     });
   } else {
     // Barra de gradiente continua
@@ -1623,24 +1658,6 @@ function clearLatentP4() {
      </div>`;
 }
 
-function clearLatentP5() {
-  document.getElementById('latent-p5').innerHTML =
-    `<div style="display:flex;align-items:center;justify-content:center;
-                 height:360px;color:var(--dota-muted);font-size:.85rem;
-                 text-align:center;padding:1rem">
-       Selecciona puntos para ver<br>la distribución del atributo
-     </div>`;
-}
-
-function clearLatentP6() {
-  document.getElementById('latent-p6').innerHTML =
-    `<div style="display:flex;align-items:center;justify-content:center;
-                 height:360px;color:var(--dota-muted);font-size:.85rem;
-                 text-align:center;padding:1rem">
-       Selecciona puntos para ver<br>el perfil en coordenadas paralelas
-     </div>`;
-}
-
 function updateLatentSelectionInfo() {
   const info = document.getElementById('latentSelectionInfo');
   if (!info) return;
@@ -1672,16 +1689,12 @@ function clearLatentSelection() {
   updateLatentHighlight();
   clearLatentP2();
   clearLatentP4();
-  clearLatentP5();
-  clearLatentP6();
 }
 
 function renderLatentDetails() {
   if (!latentState.selected || latentState.selected.length === 0) {
     clearLatentP2();
     clearLatentP4();
-    clearLatentP5();
-    clearLatentP6();
     return;
   }
 
@@ -1694,7 +1707,7 @@ function renderLatentDetails() {
 
     fetch(`/api/partida/${id}`)
       .then(r => r.json())
-      .then(d => { renderLatentP2(d); renderLatentP4(d); renderLatentP5(); renderLatentP6(); })
+      .then(d => { renderLatentP2(d); renderLatentP4(d); })
       .catch(() => {
         document.getElementById('latent-p2').innerHTML =
           `<div style="color:var(--dota-muted);padding:2rem;text-align:center">
@@ -1704,8 +1717,6 @@ function renderLatentDetails() {
   } else {
     renderLatentP2Multi();
     renderLatentP4Multi();
-    renderLatentP5();
-    renderLatentP6();
   }
 }
 
@@ -1970,246 +1981,4 @@ function showLatentTooltip(event, d) {
 
 function hideLatentTooltip() {
   if (latentTooltipEl) latentTooltipEl.style.display = 'none';
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Panel 5 — Histograma del atributo seleccionado
-// ═══════════════════════════════════════════════════════════════════════════════
-function renderLatentP5() {
-  const container = document.getElementById('latent-p5');
-  if (!latentState.selected || latentState.selected.length === 0 || !latentState.data) {
-    clearLatentP5();
-    return;
-  }
-  const attrKey = document.getElementById('latentColorAttr')?.value || 'gold_per_min_avg_r';
-  const attr = LATENT_COLOR_ATTRS.find(a => a.key === attrKey);
-  const label = attr?.label || attrKey;
-
-  // Obtener valores del atributo para todos los puntos
-  const allPoints = latentState.data.puntos;
-  const selectedPoints = allPoints.filter(d => latentState.selected.includes(d.match_id));
-  const allVals = allPoints.map(d => d[attrKey]).filter(v => v != null);
-  const selVals = selectedPoints.map(d => d[attrKey]).filter(v => v != null);
-
-  if (selVals.length === 0) { clearLatentP5(); return; }
-
-  const W = Math.max(container.clientWidth || 400, 280);
-  const H = 360;
-  const margin = { top: 30, right: 16, bottom: 40, left: 50 };
-  const innerW = W - margin.left - margin.right;
-  const innerH = H - margin.top - margin.bottom;
-
-  container.innerHTML = '';
-
-  const svg = d3.select(container).append('svg')
-    .attr('width', '100%').attr('height', H)
-    .attr('viewBox', `0 0 ${W} ${H}`)
-    .attr('preserveAspectRatio', 'xMidYMid meet');
-
-  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-
-  const extent = d3.extent(allVals);
-  const xScale = d3.scaleLinear().domain(extent).range([0, innerW]);
-  const bins = d3.bin().domain(xScale.domain()).thresholds(30)(allVals);
-  const selBins = d3.bin().domain(xScale.domain()).thresholds(30)(selVals);
-  const maxCount = d3.max(bins, d => d.length) || 1;
-  const yScale = d3.scaleLinear().domain([0, maxCount]).range([innerH, 0]);
-
-  // Ejes
-  g.append('g').attr('transform', `translate(0,${innerH})`)
-    .call(d3.axisBottom(xScale).ticks(6))
-    .call(ax => {
-      ax.selectAll('text').attr('fill', '#5a6a80').attr('font-size', '8px');
-      ax.selectAll('line').attr('stroke', '#2a3040');
-      ax.select('.domain').attr('stroke', '#2a3040');
-    });
-  g.append('g')
-    .call(d3.axisLeft(yScale).ticks(5))
-    .call(ax => {
-      ax.selectAll('text').attr('fill', '#5a6a80').attr('font-size', '8px');
-      ax.selectAll('line').attr('stroke', '#1e2840');
-      ax.select('.domain').remove();
-    });
-
-  // Barras de fondo (todos los puntos)
-  g.selectAll('.bg-bar')
-    .data(bins).enter().append('rect')
-    .attr('x', d => xScale(d.x0) + 1)
-    .attr('y', d => yScale(d.length))
-    .attr('width', d => Math.max(0, xScale(d.x1) - xScale(d.x0) - 2))
-    .attr('height', d => innerH - yScale(d.length))
-    .attr('fill', 'rgba(100,120,140,0.25)')
-    .attr('rx', 1);
-
-  // Barras de selección (highlight)
-  g.selectAll('.sel-bar')
-    .data(selBins).enter().append('rect')
-    .attr('x', d => xScale(d.x0) + 1)
-    .attr('y', d => yScale(d.length))
-    .attr('width', d => Math.max(0, xScale(d.x1) - xScale(d.x0) - 2))
-    .attr('height', d => innerH - yScale(d.length))
-    .attr('fill', 'rgba(232,184,75,0.6)')
-    .attr('stroke', 'rgba(232,184,75,0.8)')
-    .attr('stroke-width', 0.5)
-    .attr('rx', 1);
-
-  // Línea de media
-  const meanAll = d3.mean(allVals);
-  const meanSel = d3.mean(selVals);
-  if (meanAll != null) {
-    g.append('line').attr('x1', xScale(meanAll)).attr('x2', xScale(meanAll))
-      .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', 'rgba(100,120,140,0.6)').attr('stroke-dasharray', '4,3');
-    g.append('text').attr('x', xScale(meanAll) + 4).attr('y', 12)
-      .attr('fill', '#5a6a80').attr('font-size', '7.5px').text(`μ global=${meanAll.toFixed(1)}`);
-  }
-  if (meanSel != null) {
-    g.append('line').attr('x1', xScale(meanSel)).attr('x2', xScale(meanSel))
-      .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#e8b84b').attr('stroke-dasharray', '4,3');
-    g.append('text').attr('x', xScale(meanSel) + 4).attr('y', 22)
-      .attr('fill', '#e8b84b').attr('font-size', '7.5px').text(`μ selección=${meanSel.toFixed(1)}`);
-  }
-
-  // Etiquetas de ejes
-  g.append('text').attr('x', innerW / 2).attr('y', innerH + 32)
-    .attr('text-anchor', 'middle').attr('fill', '#5a6a80').attr('font-size', '8.5px')
-    .text(label);
-  g.append('text').attr('transform', 'rotate(-90)').attr('x', -innerH / 2).attr('y', -38)
-    .attr('text-anchor', 'middle').attr('fill', '#5a6a80').attr('font-size', '8.5px')
-    .text('Frecuencia');
-
-  // Título
-  svg.append('text').attr('x', margin.left).attr('y', 16)
-    .attr('fill', '#e8b84b').attr('font-size', '10px').attr('font-weight', '700')
-    .text(`Histograma — ${label} (${selVals.length} puntos seleccionados)`);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Panel 6 — Coordenadas paralelas
-// ═══════════════════════════════════════════════════════════════════════════════
-function renderLatentP6() {
-  const container = document.getElementById('latent-p6');
-  if (!latentState.selected || latentState.selected.length === 0 || !latentState.data) {
-    clearLatentP6();
-    return;
-  }
-
-  const dims = [
-    { key: 'win_pct_r',          label: 'WR R' },
-    { key: 'kda_avg_r',          label: 'KDA R' },
-    { key: 'gold_per_min_avg_r', label: 'GPM R' },
-    { key: 'hero_kills_avg_r',   label: 'Kills R' },
-    { key: 'tower_kills_avg_r',  label: 'Torres R' },
-    { key: 'observer_uses_avg_r',label: 'Visión R' },
-    { key: 'win_pct_d',          label: 'WR D' },
-    { key: 'kda_avg_d',          label: 'KDA D' },
-    { key: 'gold_per_min_avg_d', label: 'GPM D' },
-    { key: 'hero_kills_avg_d',   label: 'Kills D' },
-    { key: 'tower_kills_avg_d',  label: 'Torres D' },
-    { key: 'observer_uses_avg_d',label: 'Visión D' },
-  ];
-
-  const allPoints = latentState.data.puntos;
-  const selectedPoints = allPoints.filter(d => latentState.selected.includes(d.match_id));
-
-  // Calcular dominios
-  const domains = dims.map(d => {
-    const vals = allPoints.map(p => p[d.key]).filter(v => v != null);
-    return { ...d, extent: d3.extent(vals) };
-  });
-
-  const W = Math.max(container.clientWidth || 400, 280);
-  const H = 360;
-  const margin = { top: 30, right: 16, bottom: 24, left: 16 };
-  const innerW = W - margin.left - margin.right;
-  const innerH = H - margin.top - margin.bottom;
-
-  container.innerHTML = '';
-
-  const svg = d3.select(container).append('svg')
-    .attr('width', '100%').attr('height', H)
-    .attr('viewBox', `0 0 ${W} ${H}`)
-    .attr('preserveAspectRatio', 'xMidYMid meet');
-
-  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-
-  const xScale = d3.scalePoint().domain(domains.map(d => d.label)).range([0, innerW]).padding(0.05);
-
-  // Escalas por dimensión
-  const yScales = {};
-  domains.forEach(d => {
-    const [mn, mx] = d.extent;
-    const pad = ((mx - mn) || 1) * 0.05;
-    yScales[d.label] = d3.scaleLinear().domain([mn - pad, mx + pad]).range([innerH, 0]);
-  });
-
-  // Ejes verticales
-  domains.forEach(d => {
-    const x = xScale(d.label);
-    g.append('g')
-      .attr('transform', `translate(${x},0)`)
-      .call(d3.axisLeft(yScales[d.label]).ticks(4).tickSize(-3))
-      .call(ax => {
-        ax.selectAll('text').attr('fill', '#5a6a80').attr('font-size', '7px');
-        ax.selectAll('line').attr('stroke', '#1e2840');
-        ax.select('.domain').attr('stroke', '#2a3040');
-      });
-    g.append('text').attr('x', 0).attr('y', -8)
-      .attr('text-anchor', 'middle').attr('fill', '#7a8ea8').attr('font-size', '7.5px')
-      .text(d.label);
-  });
-
-  // Líneas de fondo (todos los puntos, muy transparentes)
-  const maxBg = Math.min(allPoints.length, 300); // limitar para performance
-  const bgSample = allPoints.length > maxBg
-    ? allPoints.filter((_, i) => i % Math.ceil(allPoints.length / maxBg) === 0)
-    : allPoints;
-
-  const line = d3.line().defined(d => d != null);
-
-  bgSample.forEach(p => {
-    const pts = domains.map(d => {
-      const v = p[d.key];
-      return v != null ? [xScale(d.label), yScales[d.label](v)] : null;
-    }).filter(Boolean);
-    if (pts.length >= 2) {
-      g.append('path')
-        .attr('d', d3.line()(pts))
-        .attr('fill', 'none')
-        .attr('stroke', 'rgba(100,120,140,0.08)')
-        .attr('stroke-width', 0.8);
-    }
-  });
-
-  // Líneas de selección (highlight)
-  selectedPoints.forEach(p => {
-    const isWin = p.radiant_win;
-    const pts = domains.map(d => {
-      const v = p[d.key];
-      return v != null ? [xScale(d.label), yScales[d.label](v)] : null;
-    }).filter(Boolean);
-    if (pts.length >= 2) {
-      g.append('path')
-        .attr('d', d3.line()(pts))
-        .attr('fill', 'none')
-        .attr('stroke', isWin ? 'rgba(92,191,138,0.7)' : 'rgba(191,92,92,0.7)')
-        .attr('stroke-width', 1.8)
-        .attr('stroke-linejoin', 'round');
-    }
-  });
-
-  // Título
-  svg.append('text').attr('x', margin.left).attr('y', 16)
-    .attr('fill', '#e8b84b').attr('font-size', '10px').attr('font-weight', '700')
-    .text(`Coordenadas Paralelas — ${selectedPoints.length} puntos`);
-
-  // Leyenda
-  const lgd = svg.append('g').attr('transform', `translate(${W - 80}, 6)`);
-  [['Radiant', '#5cbf8a'], ['Dire', '#bf5c5c']].forEach(([lbl, clr], i) => {
-    lgd.append('line').attr('x1', 0).attr('x2', 16).attr('y1', i * 13 + 4).attr('y2', i * 13 + 4)
-      .attr('stroke', clr).attr('stroke-width', 2);
-    lgd.append('text').attr('x', 20).attr('y', i * 13 + 8)
-      .attr('fill', '#8899aa').attr('font-size', '9px').text(lbl);
-  });
 }
