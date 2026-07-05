@@ -156,10 +156,10 @@ document.getElementById('mainNav').addEventListener('click', e => {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById(btn.dataset.tab).classList.add('active');
-  // Auto-cargar la primera vez que se abre la pestaña de héroes
-  if (btn.dataset.tab === 'tab-meta' && !metaCargada) cargarMeta();
   // Auto-cargar gráficos la primera vez
   if (btn.dataset.tab === 'tab-graficos' && !graficosInit) cargarGraficos();
+  // Auto-cargar el espacio latente cuando se abre por primera vez
+  if (btn.dataset.tab === 'tab-latente' && !latentState.data) cargarEspacioLatente();
 });
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
@@ -1229,7 +1229,7 @@ async function cargarGraficos() {
 
 // ─── Inicio de la aplicación ─────────────────────────────────────────────────
 cargarStats();
-cargarPartidas(1);
+cargarEspacioLatente();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ESPACIO LATENTE — Visualización D3 con vistas enlazadas
@@ -1292,6 +1292,8 @@ async function cargarEspacioLatente() {
   document.getElementById('latent-p3').innerHTML = spinHtml;
   clearLatentP2();
   clearLatentP4();
+  clearLatentP5();
+  clearLatentP6();
 
   try {
     const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}` +
@@ -1334,6 +1336,8 @@ async function cargarEspacioLatente() {
 
     renderLatentP1();
     renderLatentP3();
+    renderLatentP5();
+    renderLatentP6();
     clearLatentP2();
     clearLatentP4();
 
@@ -1977,6 +1981,104 @@ function showLatentTooltip(event, d) {
   latentTooltipEl.style.display = 'block';
   latentTooltipEl.style.left    = (event.clientX + 14) + 'px';
   latentTooltipEl.style.top     = (event.clientY - 10) + 'px';
+}
+
+function clearLatentP5() {
+  document.getElementById('latent-p5').innerHTML = `
+    <div style="color:var(--dota-muted);font-size:.85rem;display:flex;align-items:center;justify-content:center;height:360px;">
+      Calculando resumen de clusters...
+    </div>`;
+}
+
+function clearLatentP6() {
+  document.getElementById('latent-p6').innerHTML = `
+    <div style="color:var(--dota-muted);font-size:.85rem;display:flex;align-items:center;justify-content:center;height:360px;">
+      Calculando insights globales...
+    </div>`;
+}
+
+function renderLatentP5() {
+  const container = document.getElementById('latent-p5');
+  if (!latentState.data) return clearLatentP5();
+  const puntos = latentState.data.puntos;
+  const clusterStats = {};
+  puntos.forEach(p => {
+    const c = p.cluster ?? 'no-cluster';
+    if (!clusterStats[c]) clusterStats[c] = { count: 0, radiant: 0 };
+    clusterStats[c].count += 1;
+    if (p.radiant_win) clusterStats[c].radiant += 1;
+  });
+  const rows = Object.entries(clusterStats)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([cluster, stats]) => {
+      const winRate = stats.count ? Math.round(stats.radiant * 100 / stats.count) : 0;
+      const color = cluster === 'no-cluster' ? '#808090' : `hsl(${(Number(cluster) * 63) % 360}, 65%, 55%)`;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.06)">
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:${color}">Cluster ${cluster}</div>
+            <div style="font-size:.72rem;color:var(--dota-muted)">Partidas: ${stats.count.toLocaleString()}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:.82rem;font-weight:700;color:var(--dota-gold)">${winRate}%</div>
+            <div style="font-size:.72rem;color:var(--dota-muted)">Radiant win rate</div>
+          </div>
+        </div>`;
+    });
+  container.innerHTML = `
+    <div style="padding:.85rem .95rem;display:grid;gap:.55rem">
+      ${rows.join('')}
+    </div>`;
+}
+
+function renderLatentP6() {
+  const container = document.getElementById('latent-p6');
+  if (!latentState.data) return clearLatentP6();
+  const puntos = latentState.data.puntos;
+  const metrics = [
+    { key: 'gold_per_min_avg_r', label: 'GPM Radiant', color: '#5cbf8a' },
+    { key: 'xp_per_min_avg_r',   label: 'XPM Radiant', color: '#5cbf8a' },
+    { key: 'kda_avg_r',          label: 'KDA Radiant', color: '#5cbf8a' },
+  ];
+  const metricsD = [
+    { key: 'gold_per_min_avg_d', label: 'GPM Dire', color: '#bf5c5c' },
+    { key: 'xp_per_min_avg_d',   label: 'XPM Dire', color: '#bf5c5c' },
+    { key: 'kda_avg_d',          label: 'KDA Dire', color: '#bf5c5c' },
+  ];
+  const calcMean = key => {
+    const values = puntos.map(p => p[key]).filter(v => v != null);
+    return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
+  };
+  const content = metrics.map((m, idx) => {
+    const mD = metricsD[idx];
+    const vR = calcMean(m.key);
+    const vD = calcMean(mD.key);
+    const maxVal = Math.max(vR, vD, 1);
+    return `
+      <div style="display:grid;grid-template-columns:1fr auto;gap:.25rem;align-items:center;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.06)">
+        <div>
+          <div style="font-size:.8rem;color:var(--dota-muted)">${m.label} vs ${mD.label}</div>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
+            <div style="flex:1;background:rgba(255,255,255,.05);border-radius:999px;height:8px;overflow:hidden">
+              <div style="width:${Math.round((vR / maxVal) * 100)}%;height:100%;background:${m.color}"></div>
+            </div>
+            <div style="flex:1;background:rgba(255,255,255,.05);border-radius:999px;height:8px;overflow:hidden">
+              <div style="width:${Math.round((vD / maxVal) * 100)}%;height:100%;background:${mD.color}"></div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:.78rem;color:var(--dota-muted)">
+          ${fmtStat(m.key, vR)} / ${fmtStat(mD.key, vD)}
+        </div>
+      </div>`;
+  }).join('');
+  container.innerHTML = `
+    <div style="padding:.85rem .95rem;display:grid;gap:.55rem">
+      ${content}
+      <div style="padding:.6rem .8rem;border-radius:8px;background:rgba(232,184,75,.08);color:var(--dota-gold);font-size:.8rem;line-height:1.35">
+        Estos valores son promedios globales sobre las partidas proyectadas. Si Radiant supera a Dire en GPM, XPM y KDA, es una señal consistente de por qué Radiant gana más.
+      </div>
+    </div>`;
 }
 
 function hideLatentTooltip() {

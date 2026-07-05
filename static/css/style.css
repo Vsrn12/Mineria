@@ -105,6 +105,9 @@ body {
   background: var(--dota-card);
   border: 1px solid var(--dota-border);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 .card-dota .card-header-dota {
   background: var(--dota-surface);
@@ -119,6 +122,10 @@ body {
   display: flex;
   align-items: center;
   gap: .6rem;
+  flex: 0 0 auto;
+}
+.card-dota > div:not(.card-header-dota) {
+  flex: 1 1 auto;
 }
 
 /* ── TABLA ── */

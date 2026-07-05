@@ -1,0 +1,359 @@
+% ============================================================
+%  AVANCE DE PAPER — FORMATO IEEE (doble columna)
+%  Proyecto: Análisis Visual de Partidas Profesionales de Dota 2
+%  Sección: Avance 4
+% ============================================================
+
+\documentclass[conference]{IEEEtran}
+
+% --- Paquetes ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{verbatim}
+\usepackage{float}
+
+% ============================================================
+\begin{document}
+
+% --- Título ---
+\title{Dota 2 Pro Matches}
+
+% --- Autores ---
+\author{
+  \IEEEauthorblockN{Piero Adrian Delgado Chipana}
+  \IEEEauthorblockA{
+    Inteligencia de Negocios y Minería de Datos\\
+    Universidad La Salle\\
+    Arequipa, Perú\\
+  }
+}
+
+\maketitle
+
+% --- Abstract ---
+\begin{abstract}
+Este artículo presenta una investigación sobre el análisis
+visual e interactivo de partidas profesionales de
+Dota~2. Se construyó un vector de 66 características de rendimiento
+histórico por equipo y se proyectó a dos dimensiones mediante PCA,
+t-SNE y UMAP. Sobre la proyección se aplicaron algoritmos de
+agrupamiento (KMeans y DBSCAN) para descubrir patrones tácticos
+latentes. Una interfaz de vistas coordinadas permite explorar de forma
+simultánea la geometría del espacio latente, las diferencias entre
+equipos y los resultados predichos. Los resultados preliminares
+muestran agrupaciones estructuradas asociadas al estilo de juego de
+cada equipo.
+\end{abstract}
+
+\begin{IEEEkeywords}
+espacio latente, clustering, Dota~2, KNN, t-SNE, UMAP, vistas coordinadas
+\end{IEEEkeywords}
+
+% ============================================================
+\section{Introducción}
+% ============================================================
+
+Los videojuegos de arena multijugador en línea (MOBA, Multiplayer Online Battle Arena) han emergido como un fenómeno deportivo y cultural de escala global. Dota~2, desarrollado por Valve Corporation, cuenta con una escena profesional que genera millones de dólares anuales en premios y atrae decenas de millones de espectadores. Cada partida profesional constituye un evento de alta complejidad táctica: dos equipos de cinco jugadores toman cientos de decisiones en tiempo real durante sesiones de 30 a 60 minutos, generando un flujo denso de datos estadísticos que incluyen economía, combate, control de mapa y objetivos.
+
+Desde la perspectiva computacional, el análisis de estas partidas supone trabajar con datos de alta dimensionalidad. En este trabajo se dispone de un conjunto de 47{,}150 partidas profesionales registradas entre 2019 y 2021, cada una representada por 317 variables que abarcan desde identificadores y metadatos temporales hasta métricas de rendimiento por equipo y tasas de selección de 121 héroes distintos. La alta dimensionalidad dificulta tanto la aplicación directa de algoritmos de aprendizaje automático como la interpretación humana de los patrones subyacentes.
+
+La analítica visual ha demostrado ser una herramienta eficaz para abordar este tipo de desafíos: al combinar técnicas de reducción dimensional con representaciones gráficas interactivas, permite que analistas y entrenadores exploren la estructura del espacio de datos de manera intuitiva. Sin embargo, la mayor parte de los trabajos existentes en análisis de eSports se centra en métricas descriptivas aisladas o modelos predictivos, dejando de lado la exploración visual integrada del comportamiento colectivo de las partidas.
+
+El problema central que motiva esta investigación es la dificultad de comprender el resultado de una partida profesional a partir de estadísticas de rendimiento de ambos equipos.
+
+El objetivo de este trabajo es diseñar e implementar un sistema de analítica visual interactiva que permita explorar partidas profesionales de Dota~2. Concretamente, se busca: (1)~construir un vector de características de 66 dimensiones que capture el rendimiento histórico de ambos equipos; (2)~proyectar dicho vector a un espacio bidimensional mediante PCA, t-SNE y UMAP para facilitar su exploración visual; (3)~aplicar algoritmos de agrupamiento (KMeans y DBSCAN) sobre la proyección resultante para identificar patrones tácticos latentes; y (4)~integrar todo lo anterior en una interfaz de vistas coordinadas con \textit{linking and brushing} que permita al usuario correlacionar la geometría del espacio latente con las métricas específicas de cada partida, el resultado final y por qué se llegó a esa victoria.
+
+% ============================================================
+\section{Descripción general del sistema}
+% ============================================================
+
+El sistema se organiza en tres componentes principales: el backend de datos y modelos, la interfaz web interactiva y la visualización del espacio latente.
+
+\subsection{Backend de datos y modelos}
+
+El backend está basado en Flask y carga el dataset \texttt{tb\_pro\_players\_matches.csv}. Se procesan 47{,}150 partidas; se filtran 2{,}819 partidas sin historial de héroes para conservar únicamente los episodios que contienen datos de rendimiento completos. El pipeline de datos construye un vector de 66 características por partida, compuesto por métricas históricas de ambos equipos: win rate, KDA, GPM, XPM, daño, visión, objetivos, duración, kills y otros indicadores de juego.
+
+El vector de características se normaliza con \textit{StandardScaler} para garantizar que todas las métricas contribuyan de manera equilibrada a la distancia euclidiana y a las proyecciones de reducción dimensional.
+
+El backend expone APIs REST para:
+
+\begin{itemize}
+  \item obtener estadísticas globales del dataset,
+  \item entregar datos para la pestaña de gráficos descriptivos,
+  \item proyectar el espacio latente con PCA, UMAP y t-SNE,
+  \item aplicar clustering con KMeans y DBSCAN sobre la proyección 2D,
+  \item consultar detalles de una partida seleccionada.
+\end{itemize}
+
+\subsection{Interfaz web}
+
+La interfaz se implementa como una aplicación de página única (SPA) con Flask, Bootstrap 5, Chart.js y D3.js. El diseño tiene dos pestañas principales:
+
+\begin{itemize}
+  \item \textbf{Espacio Latente:} visualización interactiva con controles de método de proyección, tamaño de muestra, método de clustering y atributo de color.
+  \item \textbf{Gráficos:} vista analítica con gráficos estadísticos tradicionales que sustentan hipótesis del dominio.
+\end{itemize}
+
+El diseño prioriza que el espacio latente y los gráficos sean los únicos módulos activos en el avance actual, manteniendo la interfaz lo más limpia posible.
+
+\subsection{Arquitectura del sistema}
+
+El flujo general del sistema es:
+
+\begin{enumerate}
+  \item Carga de datos crudos y filtrado de partidas sin héroes.
+  \item Selección de las 66 métricas de rendimiento por equipo.
+  \item Imputación de valores faltantes y estandarización de las características.
+  \item Reducción de dimensionalidad a 2D con PCA, t-SNE o UMAP.
+  \item Clustering sobre la proyección 2D con KMeans o DBSCAN.
+  \item Renderización de vistas coordinadas y gráficos interactivos en el frontend.
+\end{enumerate}
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Procesamiento.png}
+  \caption{Diseño general del sistema y pipeline de procesamiento de datos.}
+  \label{fig:procesamiento}
+\end{figure}
+
+% ============================================================
+\section{Diseño del sistema visual}
+% ============================================================
+
+El sistema visual se basa en una interfaz de \textbf{vistas coordinadas} con selección y brushing sincronizados. La pantalla principal del espacio latente contiene seis paneles que permiten explorar la geometría del dataset y los detalles de las partidas. Cada vista destaca una dimensión diferente del análisis: geometría del espacio, características de la partida, distribución de atributos y patrones de agrupamiento.
+
+\subsection{Preprocesamiento}
+
+Las variables se agrupan en seis categorías principales: rendimiento, economía, combate, objetivos, visión y detalles. Cada métrica histórica se empareja entre Radiant y Dire, generando el vector de 66 dimensiones. Los atributos de héroes discretos (`hero\_<ID>\_avg\_r/d`) se descartaron para el espacio latente, porque generan 242 columnas adicionales que dispersan excesivamente la proyección sin aportar mayor claridad táctica. En su lugar, el espacio latente se construye sobre estadísticas de rendimiento agregadas.
+
+\subsection{Tarea de análisis}
+
+La tarea central que soporta el sistema es la siguiente: \textit{descubrir por qué Radiant gana la mayoría de partidas y qué variables de rendimiento histórico explican esa ventaja}. Esta tarea se descompone en tres sub-actividades:
+
+\begin{itemize}
+  \item explorar la separación de partidas ganadas por Radiant y Dire en el espacio proyectado,
+  \item comparar atributos clave de los puntos seleccionados para encontrar diferencias de GPM, XPM, KDA y visión,
+  \item identificar clusters latentes y validar si los grupos con alta tasa Radiant coinciden con perfiles de objetivos y economía.
+\end{itemize}
+
+\subsection{Vista general de componentes visuales}
+
+La exploración se organiza en seis paneles claramente diferenciados. Cada panel tiene un propósito concreto dentro del flujo analítico, y en el texto se indica en negrita dónde debe insertarse la imagen correspondiente.
+
+Para cada vista se explica:
+\begin{itemize}
+  \item el propósito,\
+  \item los datos mostrados,\
+  \item el tipo de visualización,\
+  \item las interacciones disponibles,\
+  \item y la ubicación de la imagen del panel.
+\end{itemize}
+
+% Las figuras de cada panel se insertan a continuación en su lugar correspondiente.
+
+\subsection{Panel 1 — Espacio latente por ganador}
+
+\textbf{Propósito:} Permite verificar si las partidas ganadas por Radiant y Dire se separan en el espacio proyectado.
+
+\textbf{Qué datos muestra:} Las coordenadas 2D de cada partida en la proyección PCA/UMAP/t-SNE, coloreadas por el atributo \texttt{radiant\_win}. Representa principalmente la dimensión de \textit{espacio} y la variable de resultado.
+
+\textbf{Tarea analítica apoyada:} T1 — detectar agrupaciones de ganadores y perdedores en el espacio latente.
+
+\textbf{Tipo de visualización:} Scatterplot 2D.
+
+\textbf{Interacciones:} hover con tooltip, clic en punto para seleccionar, Ctrl/Cmd+clic para selección múltiple, Shift+arrastre para selección rectangular.
+
+% --- IMAGEN A ---
+\begin{figure}[H] % <--- Cambiado de [ht] a [H]
+  \centering
+  \includegraphics[width=0.85\columnwidth]{Panel1.png}
+  \caption{Panel 1 — Espacio latente por ganador (Parte A).}
+  \label{fig:panel1_a}
+\end{figure}
+
+% --- IMAGEN B ---
+\begin{figure}[H] % <--- Cambiado de [ht] a [H]
+  \centering
+  \includegraphics[width=0.85\columnwidth]{Panel1.1.png}
+  \caption{Panel 1 — Espacio latente por ganador (Parte B).}
+  \label{fig:panel1_b}
+\end{figure}
+
+% --- IMAGEN C ---
+\begin{figure}[H] % <--- Cambiado de [ht] a [H]
+  \centering
+  \includegraphics[width=0.85\columnwidth]{Panel.1.2.png}
+  \caption{Panel 1 — Espacio latente por ganador (Parte C).}
+  \label{fig:panel1_c}
+\end{figure}
+
+\subsection{Panel 2 — Comparación Radiant vs Dire}
+
+\textbf{Propósito:} Mostrar las diferencias clave entre los dos equipos en la partida seleccionada.
+
+\textbf{Qué datos muestra:} Métricas históricas de Radiant y Dire para la partida seleccionada. Incluye dimensiones de atributos como GPM, XPM, KDA, visión, daño y objetivos.
+
+\textbf{Tarea analítica apoyada:} T2 — comparar el desempeño relativo de ambos equipos en una partida específica.
+
+\textbf{Tipo de visualización:} Barras horizontales comparativas.
+
+\textbf{Interacciones:} tooltip en cada barra, actualización dinámica al cambiar la selección.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Panel2.png}
+  \caption{Panel 2 — Comparación Radiant vs Dire.}
+  \label{fig:panel2}
+\end{figure}
+
+\subsection{Panel 3 — Vista por atributo}
+
+\textbf{Propósito:} Visualizar cómo un atributo específico se distribuye sobre la geometría del espacio latente.
+
+\textbf{Qué datos muestra:} La misma proyección 2D que Panel 1, pero coloreada según un atributo seleccionado como GPM Radiant, KDA Dire o Win Rate Radiant. Representa las dimensiones de \textit{espacio} y \textit{atributos}.
+
+\textbf{Tarea analítica apoyada:} T3 — detectar qué variables generan agrupaciones latentes y cómo se relacionan con la victoria.
+
+\textbf{Tipo de visualización:} Scatterplot 2D con escala de color continuo o categórico.
+
+\textbf{Interacciones:} selector de atributo, hover, clic, selección múltiple, brushing.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Panel3.png}
+  \caption{Panel 3 — Vista por atributo sobre la proyección.}
+  \label{fig:panel3}
+\end{figure}
+
+\subsection{Panel 4 — Vector completo de características}
+
+\textbf{Propósito:} Proporcionar un análisis detallado del registro seleccionado, con valores exactos de todas las métricas.
+
+\textbf{Qué datos muestra:} El vector completo de 66 características por partida, incluyendo estadísticas de rendimiento histórico de Radiant y Dire.
+
+\textbf{Tarea analítica apoyada:} T4 — inspeccionar valores concretos y confirmar hipótesis basadas en el perfil del punto.
+
+\textbf{Tipo de visualización:} Tabla detallada de atributos.
+
+\textbf{Interacciones:} desplazamiento vertical, lectura de valores, selección de punto.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Panel4.png}
+  \caption{Panel 4 — Vector completo de características (registro seleccionado).}
+  \label{fig:panel4}
+\end{figure}
+
+\subsection{Panel 5 — Resumen de clusters}
+
+\textbf{Propósito:} Resumir la estructura de los clusters detectados en la proyección y su winrate.
+
+\textbf{Qué datos muestra:} Número de partidas por cluster, porcentaje de victorias Radiant dentro de cada cluster, y los clusters etiquetados por el método de clustering seleccionado.
+
+\textbf{Tarea analítica apoyada:} T5 — validar patrones de agrupamiento y entender qué segmentos del espacio latente son más favorables para Radiant.
+
+\textbf{Tipo de visualización:} Lista de resumen con tarjetas de cluster.
+
+\textbf{Interacciones:} actualiza automáticamente cuando se recalcula el espacio latente con nuevos parámetros.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Panel5.png}
+  \caption{Panel 5 — Resumen de clusters y sus winrates.}
+  \label{fig:panel5}
+\end{figure}
+
+\subsection{Panel 6 — Insight global}
+
+\textbf{Propósito:} Mostrar un panorama agregado de los promedios globales de Radiant y Dire sobre las métricas más relevantes.
+
+\textbf{Qué datos muestra:} Promedios globales de GPM, XPM, KDA y otras métricas, comparados entre Radiant y Dire.
+
+\textbf{Tarea analítica apoyada:} T5 — evaluar tendencias generales de ventaja de equipo a nivel de dataset completo.
+
+\textbf{Tipo de visualización:} Barras comparativas e indicadores de texto.
+
+\textbf{Interacciones:} actualiza automáticamente al recalcular el espacio latente.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Panel6.png}
+  \caption{Panel 6 — Insight global: promedios y comparativos entre Radiant y Dire.}
+  \label{fig:panel6}
+\end{figure}
+
+\subsection{Controles de proyección y clustering}
+
+ La interfaz incluye un conjunto de controles que permiten configurar la proyección 2D y el algoritmo de agrupamiento.
+
+\begin{itemize}
+  \item \textbf{Método:} selector entre \texttt{PCA}, \texttt{t-SNE} y \texttt{UMAP}. \texttt{PCA} resume la varianza global con una transformación lineal; \texttt{t-SNE} enfatiza la estructura local (bueno para visualizar grupos locales); \texttt{UMAP} ofrece un balance entre estructura global y local y suele ser más rápido que \texttt{t-SNE} para muestras grandes.
+  \item \textbf{Muestras:} tamaño de la muestra a proyectar (por ejemplo, 1000). Aumentar la muestra mejora la representatividad pero eleva el tiempo de cómputo y la carga en el navegador.
+  \item \textbf{Cluster:} selecciona el método de agrupamiento (p. ej. \texttt{KMeans} o \texttt{DBSCAN}).
+  \item \textbf{K (KMeans):} número de clusters para \texttt{KMeans} (en la captura: 4). Valores mayores separan más segmentos; valores pequeños agrupan más casos similares.
+  \item \textbf{DBSCAN EPS:} radio de vecindad para \texttt{DBSCAN} (p. ej. 0.8). Controla qué tan cerca deben estar los puntos para considerarse densos.
+  \item \textbf{DBSCAN MIN PTS:} número mínimo de puntos dentro de \texttt{EPS} para formar un núcleo (p. ej. 5). Junto con \texttt{EPS} define la granularidad y la tolerancia al ruido.
+  \item \textbf{Color panel:} campo usado para colorear los puntos (p. ej. \texttt{Clusters 2D}, \texttt{radiant\_win} u otras métricas). Cambiar el atributo de color ayuda a detectar relaciones entre la geometría y variables de interés.
+\end{itemize}
+
+\paragraph{Interpretación rápida}
+El método elegido modifica la geometría visible. Para exploración rápida y rendimiento se utiliza \texttt{UMAP}; para resaltar estructura local se utiliza \texttt{t-SNE}; para representaciones lineales se utiliza \texttt{PCA}. Para \texttt{KMeans} fije \texttt{K} buscando estabilidad de clusters mediante validación interna o inspección visual. Para densidades irregulares utilice \texttt{DBSCAN} y ajuste \texttt{EPS} y \texttt{MIN PTS} hasta que los puntos aislados sean etiquetados como ruido en lugar de formar clusters espurios.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Controles.png}
+  \caption{Controles de proyección y clustering: método, muestra, parámetros de KMeans/DBSCAN y selector de color.}
+  \label{fig:ui-controls}
+\end{figure}
+
+% ============================================================
+\section{Caso de estudio}
+% ============================================================
+
+El caso de estudio se centra en la comparación de partidas profesionales donde Radiant y Dire presentan perfiles de rendimiento similares o divergentes, permitiendo identificar qué variables distinguen a los ganadores.
+
+\subsection{Configuración}
+
+Se utiliza la proyección t-SNE con \texttt{perplexity=30} y la muestra de 1{,}000 partidas. El backend aplica clustering sobre la proyección 2D y genera etiquetas de cluster que luego se visualizan en el panel de atributo.
+
+\subsection{Análisis de hallazgos}
+
+En el caso de estudio se emplean vistas coordinadas para:
+
+\begin{itemize}
+  \item seleccionar un grupo de puntos cercanos en el espacio latente,
+  \item verificar si esos puntos comparten alto GPM, XPM y KDA,
+  \item usar el panel de comparación Radiant vs Dire para observar diferencias en visión y objetivos,
+  \item corroborar en la tabla completa si los valores numéricos coinciden con el patrón visual.
+\end{itemize}
+
+\subsection{Resultados preliminares}
+
+Los resultados preliminares indican que las partidas con mayor probabilidad de victoria Radiant tienden a agruparse en regiones del espacio donde Radiant muestra ventajas consistentes en GPM, XPM y KDA, mientras que Dire se destaca en partidas más largas y con mayor control de visión en algunos clusters específicos.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.50\columnwidth]{Ultima.png}
+  \caption{Caso de estudio — selección de puntos y análisis coordinado.}
+  \label{fig:caso-estudio}
+\end{figure}
+% ============================================================
+
+\begin{thebibliography}{9}
+\bibitem{acm} Disponible en: \url{https://dl.acm.org/doi/pdf/10.1145/3637303}
+
+\bibitem{calvo-dataset} T. Calvo, "Dota 2 Pro Players Matches 2019--2021 [Dataset]", Kaggle, 2021. Disponible en: \url{https://www.kaggle.com/datasets/teocalvo/dota2-pro-players-matches-2019-202106/}
+
+\bibitem{calvo-paper} T. Calvo et al., "Predicting the Outcome of Dota 2 Professional Matches", arXiv:2106.01782, 2021. Disponible en: \url{https://arxiv.org/pdf/2106.01782}
+
+\bibitem{scikit-learn} F. Pedregosa et al., "Scikit-learn: Machine Learning in Python", Journal of Machine Learning Research, vol. 12, pp. 2825--2830, 2011.
+
+\bibitem{valve} Valve Corporation, "Dota 2 — Portal oficial", Disponible en: \url{https://www.dota2.com/}
+\end{thebibliography}
+
+\end{document}
