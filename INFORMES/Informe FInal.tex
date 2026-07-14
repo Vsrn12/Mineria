@@ -1,0 +1,432 @@
+% ============================================================
+%  AVANCE DE PAPER — FORMATO IEEE (doble columna)
+%  Proyecto: Análisis Visual de Partidas Profesionales de Dota 2
+%  Sección: Avance 4
+% ============================================================
+
+\documentclass[conference]{IEEEtran}
+
+% --- Paquetes ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{verbatim}
+\usepackage{float}
+\usepackage{caption}
+
+\newcommand{\figplaceholder}[2]{%
+  \begin{center}
+    \fbox{%
+      \begin{minipage}{0.9\columnwidth}
+        \centering
+        \vspace{1.2cm}
+        {\bfseries #1}\\[0.35em]
+        {\small #2}
+        \vspace{1.2cm}
+      \end{minipage}%
+    }
+  \end{center}
+}
+
+% ============================================================
+\begin{document}
+
+% --- Título ---
+\title{Dota 2 Pro Matches}
+
+% --- Autores ---
+\author{
+  \IEEEauthorblockN{Piero Adrian Delgado Chipana}
+  \IEEEauthorblockA{
+    Inteligencia de Negocios y Minería de Datos\\
+    Universidad La Salle\\
+    Arequipa, Perú\\
+  }
+}
+
+\maketitle
+
+% --- Abstract ---
+\begin{abstract}
+Este informe presenta el desarrollo de \textit{Dota 2 Pro Matches}, una
+aplicación web de anal\'itica visual para explorar 47\,150 partidas
+profesionales de Dota~2 registradas entre 2019 y mediados de 2021. La
+herramienta representa cada partida mediante un vector de 66
+caracter\'isticas hist\'oricas por equipo, combina b\'usqueda por
+similitud con KNN y proyecta los datos a 2D con PCA, UMAP o t-SNE para
+facilitar su interpretaci\'on visual. La interfaz final, organizada en
+una pesta\~na de \textbf{Descripci\'on} y una pesta\~na de
+\textbf{Gr\'aficos}, incorpora ocho paneles coordinados que permiten
+comparar Radiant y Dire, revisar la matriz expl\'icita de una
+selecci\'on y examinar un mapa de calor del atributo activo. El sistema
+se actualiz\'o para priorizar claridad de lectura, reducir ruido
+visual y explicar, desde la experiencia del usuario, por qu\'e una
+partida se parece a otra y qu\'e factores est\'an relacionados con la
+victoria.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Dota~2, anal\'itica visual, KNN, PCA, UMAP, t-SNE, vistas coordinadas,
+espacio latente
+\end{IEEEkeywords}
+
+% ============================================================
+\section{A1. Introducci\'on}
+% ============================================================
+
+Dota~2 es un MOBA de cinco contra cinco donde el resultado depende de
+decenas de decisiones econ\'omicas, t\'acticas y de mapa. En la escena
+profesional, una partida no se entiende solo por el marcador final: hay
+que mirar c\'omo llegaban los equipos, qu\'e tan s\'olido era su
+historial reciente, qu\'e tanto controlaban el mapa y qu\'e tan bien
+estaban convirtiendo ese control en objetivos.
+
+Ese es el problema que resuelve este proyecto. El sistema no se limita a
+mostrar una lista de partidas; explica al usuario qu\'e representa cada
+observaci\'on y c\'omo se puede explorar. La primera vista visible en la
+aplicaci\'on se titula \textbf{Descripci\'on}, porque el objetivo es que
+una persona que conoce Dota~2 entienda de inmediato qu\'e hace la
+herramienta: comparar Radiant y Dire antes del match, buscar partidas
+parecidas, leer las diferencias de rendimiento y encontrar patrones
+visuales sin perder el contexto del juego.
+
+El trabajo parte de un dataset de 47\,150 partidas profesionales con 317
+columnas originales. Tras el preprocesamiento quedan 42\,932 partidas
+v\'alidas para el an\'alisis t\'actico. El backend informa el estado de
+carga con el mensaje:
+
+\begin{quote}
+\texttt{[OK] Dataset cargado: 47150 partidas | v\'alidas: 42932 | sin
+h\'eroes: 4218 | 6618.7 ms}
+\end{quote}
+
+El objetivo general es construir una herramienta clara, t\'ecnica y
+usable para explicar por qu\'e Radiant suele ganar m\'as partidas y qu\'e
+variables del rendimiento hist\'orico aportan m\'as informaci\'on.
+
+\subsection{Usuarios objetivo}
+La herramienta se dise\~n\'o para dos perfiles de usuario con necesidades
+distintas:
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=3pt]
+  \item \textbf{Entrenadores de Dota~2:} analizan patrones de partidas
+  para evaluar si un juego todav\'ia es recuperable o si, por la
+  diferencia estructural entre equipos, debe asumirse como una partida
+  casi perdida. Para este perfil, el valor principal est\'a en comparar
+  r\'apido GPM, XPM, KDA, objetivos y visi\'on entre Radiant y Dire.
+  \item \textbf{Desarrolladores de Dota~2:} revisan tendencias globales
+  para detectar posibles desequilibrios del juego, ubicar d\'onde falla
+  m\'as el balance competitivo y orientar parches que reduzcan el margen
+  de error entre ambos bandos.
+\end{itemize}
+
+\section{A2. Trabajos Relacionados}
+El trabajo se apoya en tres referencias principales. Primero, el dataset
+de Teo Calvo sobre partidas profesionales de Dota~2~\cite{calvo-dataset},
+que provee una base estructurada de estad\'isticas agregadas para cada
+partida. Segundo, el paper de referencia sobre predicci\'on de
+resultados~\cite{calvo-paper}, que motiva el uso de ventanas
+hist\'oricas y variables agregadas por equipo. Tercero, el marco de
+anal\'itica visual para datos complejos~\cite{acm}, que inspira la
+organización de vistas coordinadas y la idea de pasar de un espacio de
+alta dimensionalidad a una lectura humana del comportamiento.
+
+La diferencia principal de esta implementaci\'on frente a un enfoque
+puramente predictivo es que la aplicaci\'on se dise\~n\'o para ser le\'ida
+por una persona, no solo por un modelo. El usuario puede ver la
+similitud entre partidas, comparar atributos concretos y verificar por
+qu\'e una regi\'on del espacio latente sugiere ventaja de un bando. Ese
+aporte es importante porque el gap m\'as frecuente en este tipo de
+proyectos es la falta de una interfaz que traduzca el dato num\'erico en
+una lectura operable.
+
+\section{A3. Modelos}
+\subsection{KNN para b\'usqueda por similitud}
+El modelo de partida similar usa K-Nearest Neighbors sobre un vector de
+66 variables hist\'oricas: 33 por Radiant y 33 por Dire.
+
+Antes de medir distancias, el vector se estandariza con
+\textit{StandardScaler}. Esto evita que variables de gran magnitud, como
+oro total o da\~no a torres, dominen el espacio y deja que GPM, XPM, KDA,
+visi\'on y objetivos aporten de forma m\'as equilibrada. La b\'usqueda se
+realiza con una estructura \textit{BallTree} y distancia euclidiana.
+
+\subsection{Reducci\'on de dimensionalidad}
+Para proyectar el vector a 2D se usan tres t\'ecnicas: PCA, UMAP y
+t-SNE. PCA ofrece una lectura global y reproducible; UMAP preserva
+relaciones locales con buena estabilidad; t-SNE enfatiza agrupamientos
+locales y ayuda a identificar vecindades claras. En la herramienta final,
+el usuario elige el m\'etodo desde la interfaz, pero la l\'ectura visual
+siempre se mantiene sobre el mismo conjunto de 66 variables.
+
+\subsection{Agrupamiento visual}
+El backend sigue calculando agrupamientos sobre la proyecci\'on 2D, pero
+la interfaz actual deja menos peso al control de clustering y m\'as peso
+a la exploraci\'on visual. La decisi\'on fue intencional: quitar ruido
+ayuda a que el usuario entienda mejor el mapa y no se distraiga con
+par\'ametros que, para una lectura inicial, aportan menos que la propia
+geometr\'ia de los puntos.
+
+\section{A4. Overview }
+\subsection{Dataset}
+El archivo principal es \texttt{tb\_pro\_players\_matches.csv}. Tiene
+317 columnas: 3 identificadores, 72 columnas de estad\'isticas hist\'oricas
+por equipo y 242 columnas de pick rate de h\'eroes. El espacio latente no
+usa las 242 columnas de héroes porque son muy dispersas y aumentan la
+dimensionalidad sin mejorar la lectura del rendimiento. En cambio, se
+trabaja con estad\'isticas agregadas que s\'i describen lo que importa en
+el juego: econom\'ia, combate, visi\'on, objetivos y duraci\'on.
+
+Adem\'as, para el vector anal\'itico se omiten par\'ametros de bajo valor
+explicativo directo en la lectura t\'actica:
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=3pt]
+  \item \texttt{freq\_r/freq\_d}: describen cu\'antas partidas hist\'oricas
+  tiene el equipo, pero no explican por s\'i mismas el estilo de juego del
+  match analizado.
+  \item \texttt{recencia\_r/recencia\_d}: miden cercan\'ia temporal del
+  historial; son \textit{metadata} de contexto y no rendimiento t\'actico.
+  \item \texttt{lane\_efficiency\_avg\_r/d}: se evalu\'o en el avance,
+  pero present\'o baja estabilidad interpretativa frente a GPM, XPM y KDA.
+\end{itemize}
+
+Las 242 columnas de picks de h\'eroes tampoco se eliminan del dataset
+original; simplemente se excluyen del c\'alculo del espacio latente para
+evitar una proyecci\'on excesivamente dispersa que dificulte la lectura.
+
+La distribuci\'on temporal del dataset cubre 2019, 2020 y la primera
+mitad de 2021. Los resultados globales muestran una ligera ventaja de
+Radiant, con 52.1\% de victorias frente a 47.9\% de Dire.
+
+\subsection{Preprocesamiento}
+El pipeline de preprocesamiento sigue una secuencia clara:
+\begin{enumerate}
+  \item detecci\'on de partidas con informaci\'on completa para ambos equipos;
+  \item filtrado de partidas sin datos de héroes;
+  \item selecci\'on de 66 estad\'isticas de rendimiento;
+  \item imputaci\'on de valores faltantes con la media de cada columna;
+  \item estandarizaci\'on para igualar escalas;
+  \item proyecci\'on o b\'usqueda por similitud seg\'un la vista activa.
+\end{enumerate}
+
+El filtro de partidas sin h\'eroes se justifica porque esas filas
+corresponden, en la pr\'actica, a encuentros que no llegaron al juego
+efectivo: se quedaron en fase de picks o fueron registros incompletos
+sin selecci\'on v\'alida de h\'eroes para Radiant y Dire. Mantenerlas
+contamina el an\'alisis, porque no representan rendimiento real dentro del
+mapa. Por eso se excluyen 4\,218 casos y se trabaja con 42\,932 partidas
+v\'alidas.
+
+Este flujo explica por qu\'e la herramienta es estable y relativamente
+r\'apida: no intenta representar todo el CSV de golpe, sino lo que de
+verdad aporta contexto t\'actico y decisiones accionables.
+
+\subsection{Librer\'ias usadas y para qu\'e sirven}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\columnwidth}{>{\raggedright\arraybackslash}p{2.5cm}X}
+\toprule
+\textbf{Librer\'ia} & \textbf{Uso en el sistema} \\
+\midrule
+Flask & Backend web, rutas REST y renderizado de la interfaz. \\
+pandas & Carga y limpieza del CSV, manipulaci\'on de tabulares. \\
+NumPy & Operaciones num\'ericas y soporte para matrices. \\
+scikit-learn & StandardScaler, PCA, t-SNE, KNN, KMeans y DBSCAN. \\
+Polars & Lectura r\'apida del CSV cuando est\'a disponible. \\
+Chart.js & Gr\'aficos resumidos de la pesta\~na \textit{Gr\'aficos}. \\
+D3.js & Scatterplots coordinados, barras comparativas y heatmap. \\
+Bootstrap & Maquetaci\'on responsiva y estilo general. \\
+Bootstrap Icons & Iconograf\'ia de la interfaz. \\
+requests & Consumo de la API de OpenDota para soportes de datos. \\
+\bottomrule
+\end{tabularx}
+\caption{Librer\'ias principales y su funci\'on dentro del sistema.}
+\end{table}
+
+\subsection{Pipeline general}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Procesamiento.png}
+  \caption{Pipeline general de carga, filtrado, imputaci\'on, escalamiento y proyecci\'on.}
+  \label{fig:procesamiento}
+\end{figure}
+
+\section{A5. Dise\~no Visual (Estructura)}
+La interfaz : \textbf{Espacio Latente}. La que el usuario ve para entender el sistema.
+
+\subsection{Vista Espacio Latente}
+Esta vista reemplaza la entrada t\'ecnica anterior por una explicaci\'on m\'as humana. Ya no se presenta como una pared de controles, sino como una guía r\'apida para alguien que ya conoce Dota~2 y quiere entender qu\'e puede hacer la herramienta. El texto inicial resume tres ideas: cada punto es una partida, la posición de ese punto indica similitud hist\'orica, y la selecci\'on permite comparar Radiant contra Dire.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Descripcion.png}
+  \caption{Vista principal.}
+  \label{fig:descripcion}
+\end{figure}
+
+\subsection{Estructura del espacio latente}
+La versi\'on actual del espacio latente usa ocho paneles coordinados. La lectura se organiz\'o para que lo m\'as importante quede arriba y lo m\'as detallado quede abajo. Esa decisi\'on mejora la usabilidad y evita que el usuario se pierda entre controles t\'ecnicos.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\columnwidth}{>{\raggedright\arraybackslash}p{1.9cm}X}
+\toprule
+\textbf{Panel} & \textbf{Qu\'e hace} \\
+\midrule
+1 & Muestra el mapa 2D coloreado por ganador; sirve para ver c\'omo se agrupan las partidas. \\
+2 & Compara los atributos del punto seleccionado o del promedio de la selecci\'on. \\
+3 & Colorea la misma nube por un atributo elegido por el usuario. \\
+4 & Presenta la tabla completa del registro seleccionado. \\
+5 & Resume el atributo de color activo. \\
+6 & Muestra GPM, XPM y KDA como valores globales. \\
+7 & Presenta una matriz expl\'icita de la selecci\'on. \\
+8 & Ofrece un mapa de calor del atributo activo. \\
+\bottomrule
+\end{tabularx}
+\caption{Estructura actual de la vista de espacio latente.}
+\end{center}
+
+\subsection{Panel 1 — Espacio latente por ganador}
+\textbf{Propósito:} Ver si las partidas ganadas por Radiant y Dire se mezclan o se separan en el plano proyectado.
+
+\textbf{Qué muestra:} Cada punto corresponde a una partida. El color indica quién ganó. Si puntos cercanos se agrupan, significa que sus perfiles históricos son parecidos.
+
+\textbf{Tarea apoyada:} detectar la estructura general del espacio y ubicar regiones dominadas por Radiant o Dire.
+
+\textbf{Interacciones:} clic, selección múltiple, brushing y tooltip.
+
+\includegraphics[width=0.85\columnwidth]{Panel1.png}
+
+\includegraphics[width=0.85\columnwidth]{Panel1.1.png}
+
+\includegraphics[width=0.85\columnwidth]{Panel.1.2.png}
+
+\subsection{Panel 2 — Comparación Radiant vs Dire}
+\textbf{Propósito:} Mostrar, sin rodeos, cómo venían los dos equipos en la partida seleccionada.
+
+\textbf{Qué muestra:} Barras comparativas de GPM, XPM, KDA, visión, objetivos y combate.
+
+\textbf{Tarea apoyada:} comparar rápidamente quién llegaba mejor preparado al match.
+
+\includegraphics[width=0.95\columnwidth]{Panel2.png}
+
+\subsection{Panel 3 — Vista por atributo}
+\textbf{Propósito:} Revisar qué pasa cuando la misma nube se colorea con otra variable.
+
+\textbf{Qué muestra:} La proyección 2D coloreada por atributos como Win Rate Radiant, KDA, GPM o XPM. Permite ver si ese atributo organiza el espacio o si no aporta mucha separación.
+
+\textbf{Tarea apoyada:} descubrir qué variables forman zonas más densas o más favorables para Radiant.
+
+\includegraphics[width=0.95\columnwidth]{Panel3.png}
+
+\subsection{Panel 4 — Vector completo de características}
+\textbf{Propósito:} Dejar la partida seleccionada escrita con sus valores completos.
+
+\textbf{Qué muestra:} El detalle numérico de la observación, útil para comprobar si la lectura visual se sostiene con los datos exactos.
+
+\textbf{Tarea apoyada:} inspección fina de un caso puntual o de una selección múltiple.
+
+\includegraphics[width=0.95\columnwidth]{Panel4.png}
+
+\subsection{Panel 5 — Relación de color activo}
+\textbf{Propósito:} Explicar de dónde salen los colores del Panel 3.
+
+\textbf{Qué muestra:} Si el atributo es categórico, se observan porcentajes; si es continuo, se ven mínimos, promedio y mediana. Este panel ayuda a interpretar el atributo sin saturar la pantalla.
+
+\textbf{Tarea apoyada:} entender rápidamente la distribución del color activo.
+
+\includegraphics[width=0.95\columnwidth]{Panel5.png}
+
+\subsection{Panel 6 — Valores globales en las 3 características críticas}
+\textbf{Propósito:} Resumir las variables que más ayudan a entender la ventaja competitiva.
+
+\textbf{Qué muestra:} GPM, XPM y KDA globales comparados entre Radiant y Dire.
+
+\textbf{Tarea apoyada:} explicar de forma simple por qué un bando suele llegar mejor armado que el otro.
+
+\includegraphics[width=0.95\columnwidth]{Panel6.png}
+
+\subsection{Panel 7 — Matriz explícita}
+\textbf{Propósito:} Dar una comparación rápida de la selección sin tener que leer toda la tabla.
+
+\textbf{Qué muestra:} Promedios Radiant y Dire para una pequeña lista de métricas críticas, junto con su diferencia.
+
+\textbf{Tarea apoyada:} acelerar la lectura de una selección múltiple y hacer más directa la comparación.
+
+\includegraphics[width=0.85\columnwidth]{Panel7.png}
+
+\subsection{Panel 8 — Mapa de calor del atributo}
+\textbf{Propósito:} Mostrar dónde se acumulan los valores altos o bajos del atributo activo.
+
+\textbf{Qué muestra:} Un mapa de calor sobre el plano latente que usa el mismo atributo seleccionado para colorear el espacio de forma más densa.
+
+\textbf{Tarea apoyada:} ver de un vistazo las zonas dominantes del atributo elegido.
+
+\includegraphics[width=0.85\columnwidth]{Panel8.png}
+
+\subsection{Controles de la vista}
+La vista actual mantiene solo los controles que el usuario realmente usa: método de proyección, número de muestras, valor de \textit{K} para el análisis de similitud interna y selector del color del Panel 3. Se quitaron elementos que solo ocupaban espacio y no ayudaban a la lectura inicial. La idea fue dejar una pantalla más limpia, más lógica y menos técnica.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{Controles.png}
+  \caption{Controles principales de la interfaz actual.}
+  \label{fig:controles}
+\end{figure}
+
+\section{A6. Mapeo Vistas-Tareas}
+En esta sección se justifica la relación entre cada vista y la tarea que cumple. La matriz explícita pedida por la rúbrica se resume aquí con el sentido operativo de cada panel.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\columnwidth}{>{\raggedright\arraybackslash}p{1.6cm}X>{\raggedright\arraybackslash}p{3.2cm}}
+\toprule
+\textbf{Vista} & \textbf{Tarea} & \textbf{Justificación} \\
+\midrule
+Panel 1 & Separar ganadores y perdedores & Es la primera lectura de la geometría del dataset. \\
+Panel 2 & Comparar una partida concreta & Sirve para explicar por qué un match se ve mejor o peor. \\
+Panel 3 & Explorar atributos individuales & Permite identificar qué variable organiza mejor el plano. \\
+Panel 4 & Leer valores exactos & Evita depender solo de la intuición visual. \\
+Panel 5 & Entender el color activo & Hace visible la distribución del atributo seleccionado. \\
+Panel 6 & Resumir la ventaja estructural & Resume GPM, XPM y KDA en lenguaje fácil. \\
+Panel 7 & Comparar rápido una selección & Reduce el tiempo de lectura para grupos de puntos. \\
+Panel 8 & Ver densidad por atributo & Ayuda a notar concentraciones y zonas dominantes. \\
+\bottomrule
+\end{tabularx}
+\caption{Matriz explícita de vistas y tareas analíticas.}
+\end{center}
+
+\subsection{Figura de apoyo}
+\includegraphics[width=0.5\columnwidth]{Ultima.png}
+
+\section{Resultados y discusión}
+La herramienta actual es más precisa que las versiones de avance porque eliminó ruido visual y deja un mensaje más claro al usuario. La vista principal se presenta como \textbf{Descripción}, lo cual ayuda a que alguien con conocimiento de Dota~2 entienda el propósito del sistema sin tener que leer primero una pared de controles.
+
+En términos analíticos, el sistema confirma tres ideas importantes. La primera es que GPM y XPM siguen siendo las señales más estables para explicar ventaja histórica. La segunda es que KDA y visión complementan esa lectura, especialmente cuando dos partidas parecen similares pero no en comportamiento real. La tercera es que la combinación de vista general, matriz explícita y tabla completa permite pasar de una intuición visual a una verificación numérica concreta.
+
+El espacio latente también ayuda a detectar partidas con perfiles muy parecidos, algo útil cuando se busca una referencia táctica. Si dos puntos quedan cerca, el usuario puede revisar sus paneles de detalle y confirmar si la similitud realmente se sostiene o si solo parece cercana por la proyección 2D.
+
+\section{Conclusiones}
+El proyecto finaliza como una herramienta funcional, clara y justificable para estudiar partidas profesionales de Dota~2. La aplicación combina KNN, reducción de dimensionalidad y vistas coordinadas para que el usuario pueda comprender el comportamiento histórico de los equipos antes del match, buscar partidas similares y confirmar con datos exactos lo que sugiere el plano visual.
+
+\begin{thebibliography}{9}
+\bibitem{acm} Disponible en: \url{https://dl.acm.org/doi/pdf/10.1145/3637303}
+
+\bibitem{calvo-dataset} T. Calvo, "Dota 2 Pro Players Matches 2019--2021 [Dataset]", Kaggle, 2021. Disponible en: \url{https://www.kaggle.com/datasets/teocalvo/dota2-pro-players-matches-2019-202106/}
+
+\bibitem{calvo-paper} T. Calvo et al., "Predicting the Outcome of Dota 2 Professional Matches", arXiv:2106.01782, 2021. Disponible en: \url{https://arxiv.org/pdf/2106.01782}
+
+\bibitem{scikit-learn} F. Pedregosa et al., "Scikit-learn: Machine Learning in Python", Journal of Machine Learning Research, vol. 12, pp. 2825--2830, 2011.
+
+\bibitem{valve} Valve Corporation, "Dota 2 — Portal oficial", Disponible en: \url{https://www.dota2.com/}
+\end{thebibliography}
+
+\end{document}

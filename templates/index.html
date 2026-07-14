@@ -61,7 +61,7 @@
     </button>
   </li>
   <li class="nav-item">
-    <button data-tab="tab-graficos">
+    <button data-tab="tab-graficos" hidden disabled aria-hidden="true" tabindex="-1">
       <i class="bi bi-bar-chart-line"></i> Gráficos
     </button>
   </li>
@@ -353,22 +353,38 @@
 <!-- TAB 6: ESPACIO LATENTE -->
 <div id="tab-latente" class="tab-panel active">
 
-  <!-- Controles globales -->
-  <div class="card-dota mb-3" style="padding:1rem 1.4rem">
-    <div class="d-flex gap-3 flex-wrap align-items-center">
+  <div class="card-dota mb-3 latent-hero-banner">
+    <div class="latent-hero-copy">
+      <div class="card-header-dota" style="border-bottom:0;background:transparent;padding:1rem 1.1rem .35rem">
+        <i class="bi bi-bounding-box-circles" style="color:var(--dota-gold)"></i>
+        Descripción
+      </div>
+      <div style="padding:0 1.1rem 1rem">
+        <div style="font-size:1rem;font-weight:800;color:var(--dota-text);line-height:1.35;max-width:920px">
+          Esta vista le explica al usuario cómo se lee el sistema: cada punto es una partida profesional y su posición muestra qué tan parecidas son sus estadísticas históricas antes del match.
+        </div>
+        <div style="margin-top:.55rem;font-size:.83rem;color:var(--dota-muted);line-height:1.55;max-width:920px">
+          Si conoces Dota 2, aquí puedes revisar quién venía mejor preparado, comparar Radiant contra Dire, buscar partidas parecidas y entender por qué ciertos equipos terminan ganando más.
+          La selección es directa: clic para un punto, Ctrl/Cmd + clic para varios y Shift + arrastre para marcar grupos.
+        </div>
+      </div>
+    </div>
+  </div>
 
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">Método:</label>
-        <select id="latentMethod" class="form-select-dota" style="width:110px">
+  <div class="card-dota mb-3" style="padding:1rem 1.1rem">
+    <div class="latent-toolbar">
+      <div>
+        <label style="color:var(--dota-muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em">Método</label>
+        <select id="latentMethod" class="form-select-dota" style="width:112px">
           <option value="pca" selected>PCA</option>
           <option value="umap">UMAP</option>
           <option value="tsne">t-SNE</option>
         </select>
       </div>
 
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">Muestras:</label>
-        <select id="latentN" class="form-select-dota" style="width:110px">
+      <div>
+        <label style="color:var(--dota-muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em">Muestras</label>
+        <select id="latentN" class="form-select-dota" style="width:112px">
           <option value="500">500</option>
           <option value="1000" selected>1 000</option>
           <option value="2000">2 000</option>
@@ -377,32 +393,14 @@
         </select>
       </div>
 
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">Cluster:</label>
-        <select id="latentClusterMethod" class="form-select-dota" style="width:130px">
-          <option value="kmeans" selected>KMeans</option>
-          <option value="dbscan">DBSCAN</option>
-        </select>
+      <div>
+        <label style="color:var(--dota-muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em">K</label>
+        <input id="latentClusterK" type="number" class="form-control-dota" value="4" min="1" style="width:82px" />
       </div>
 
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">K (KMeans):</label>
-        <input id="latentClusterK" type="number" class="form-control-dota" value="4" min="1" style="width:80px" />
-      </div>
-
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">DBSCAN eps:</label>
-        <input id="latentClusterEps" type="number" class="form-control-dota" value="0.8" min="0.1" step="0.1" style="width:80px" />
-      </div>
-
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">DBSCAN min pts:</label>
-        <input id="latentClusterMinSamples" type="number" class="form-control-dota" value="5" min="1" style="width:80px" />
-      </div>
-
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="color:var(--dota-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em">Color Panel&nbsp;3:</label>
-        <select id="latentColorAttr" class="form-select-dota" style="width:210px" onchange="renderLatentP3()">
+      <div>
+        <label style="color:var(--dota-muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em">Color Panel 3</label>
+        <select id="latentColorAttr" class="form-select-dota" style="width:220px" onchange="renderLatentP3()">
           <option value="cluster">Clusters 2D</option>
           <option value="win_pct_r">Win Rate Radiant</option>
           <option value="kda_avg_r">KDA Radiant</option>
@@ -427,140 +425,128 @@
       <span id="latentSelectionInfo" style="color:var(--dota-muted);font-size:.78rem"></span>
     </div>
 
-    <div style="margin-top:.55rem;font-size:.75rem;color:var(--dota-muted)">
-      Aplica reducción de dimensionalidad sobre el vector de ~60 características por partida
-      y proyecta cada registro a una posición <strong style="color:var(--dota-text)">(x, y)</strong> en 2D.
-      Haz clic en un punto para seleccionarlo. Usa <strong>Ctrl/Cmd + clic</strong> para seleccionar varios puntos.
-      Si quieres seleccionar un grupo mayor, mantén <strong>Shift</strong> y arrastra sobre el fondo del gráfico.
-      La selección se sincroniza entre
-      <strong style="color:var(--dota-text)">Panel 1</strong> y
-      <strong style="color:var(--dota-text)">Panel 3</strong>.
-    </div>
   </div>
 
-  <div class="card-dota mb-3" style="padding:1rem 1.4rem">
-    <div class="d-flex flex-column gap-2">
-      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
-        <i class="bi bi-lightbulb-fill" style="color:var(--dota-gold)"></i>
-        <span style="font-size:.82rem;font-weight:700;color:var(--dota-gold);text-transform:uppercase;letter-spacing:.06em">Tareas del Espacio Latente</span>
-      </div>
-      <div style="color:var(--dota-muted);font-size:.84rem;line-height:1.6">
-        <strong>Tarea 1:</strong> explora cómo se agrupan las partidas ganadas por Radiant y Dire en el espacio proyectado.
-        <br>
-        <strong>Tarea 2:</strong> compara atributos clave (GPM, XPM, KDA y visión) para los puntos seleccionados y descubre qué distingue a los ganadores.
-        <br>
-        <strong>Tarea 3:</strong> identifica clusters y valida si los grupos con alta tasa Radiant coinciden con ventajas macroeconómicas u objetivos.
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.76rem;color:var(--dota-muted)">
-        <span class="badge-hip" style="background:rgba(92,191,138,.12);border-color:rgba(92,191,138,.28);color:#5cbf8a">Panel 1: Vista principal del espacio latente</span>
-        <span class="badge-hip" style="background:rgba(232,184,75,.12);border-color:rgba(232,184,75,.28);color:#e8b84b">Panel 2: Comparación Radiant vs Dire</span>
-        <span class="badge-hip" style="background:rgba(191,92,92,.12);border-color:rgba(191,92,92,.28);color:#bf5c5c">Panel 3: Atributo coloreado</span>
-        <span class="badge-hip" style="background:rgba(100,110,130,.12);border-color:rgba(100,110,130,.28);color:#a0a8b8">Panel 4: Vector completo</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Cuadrícula 2×2 -->
   <div class="row g-3">
 
-    <!-- Panel 1: Espacio latente — color = ganador -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xxl-7">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-bounding-box-circles" style="color:var(--dota-gold)"></i>
           Panel 1 — Espacio Latente (ganador)
-          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
-            Clic en un punto para seleccionar
-          </span>
+          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">Clic para seleccionar</span>
         </div>
-        <div id="latent-p1"
-             style="min-height:360px;display:flex;align-items:center;justify-content:center;padding:1rem">
-          <span style="color:var(--dota-muted);font-size:.85rem">Presiona «Calcular» para proyectar</span>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Aquí veo cómo quedan mezcladas las partidas según quién ganó. Si dos puntos están cerca, normalmente se parecen bastante en su forma de jugar.
+        </div>
+        <div id="latent-p1" style="min-height:340px;display:flex;align-items:center;justify-content:center;padding:1rem">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Presiona «Calcular» para proyectar</span>
         </div>
       </div>
     </div>
 
-    <!-- Panel 2: Atributos del punto seleccionado -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12 col-xxl-5">
+      <div class="card-dota">
+        <div class="card-header-dota">
+          <i class="bi bi-palette-fill" style="color:var(--dota-gold)"></i>
+          Panel 3 — Vista por Atributo
+          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">Color = selector</span>
+        </div>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Aquí cambio el color para ver si un atributo separa mejor a los equipos o si todo queda bastante mezclado.
+        </div>
+        <div id="latent-p3" style="min-height:340px;display:flex;align-items:center;justify-content:center;padding:1rem">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Presiona «Calcular» para proyectar</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-bar-chart-horizontal-fill" style="color:var(--dota-gold)"></i>
           Panel 2 — Atributos del Punto Seleccionado
         </div>
-        <div id="latent-p2"
-             style="min-height:360px;max-height:500px;overflow-y:auto;
-                    display:flex;align-items:center;justify-content:center">
-          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">
-            Selecciona un punto en Panel 1 o Panel 3<br>para comparar atributos
-          </span>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Este panel me cuenta cómo vienen jugando Radiant y Dire en las métricas más importantes del punto que marqué.
+        </div>
+        <div id="latent-p2" style="min-height:300px;max-height:460px;overflow-y:auto;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Selecciona un punto en Panel 1 o Panel 3 para comparar atributos</span>
         </div>
       </div>
     </div>
 
-    <!-- Panel 3: Espacio latente — color = atributo elegido -->
-    <div class="col-12 col-xl-6">
-      <div class="card-dota">
-        <div class="card-header-dota">
-          <i class="bi bi-palette-fill" style="color:var(--dota-gold)"></i>
-          Panel 3 — Vista por Atributo
-          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
-            Color = atributo del selector
-          </span>
-        </div>
-        <div id="latent-p3"
-             style="min-height:360px;display:flex;align-items:center;justify-content:center">
-          <span style="color:var(--dota-muted);font-size:.85rem">Presiona «Calcular» para proyectar</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Panel 4: Vector completo de atributos -->
-    <div class="col-12 col-xl-6">
+    <div class="col-12">
       <div class="card-dota">
         <div class="card-header-dota">
           <i class="bi bi-table" style="color:var(--dota-gold)"></i>
           Panel 4 — Vector de Características
         </div>
-        <div id="latent-p4"
-             style="min-height:360px;max-height:500px;overflow-y:auto;
-                    display:flex;align-items:center;justify-content:center">
-          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">
-            Selecciona un punto<br>para ver el vector completo de atributos
-          </span>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Acá dejo la foto completa del punto seleccionado, para mirar las cifras sin resumirlas demasiado.
+        </div>
+        <div id="latent-p4" style="min-height:300px;max-height:460px;overflow-y:auto;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Selecciona un punto para ver el vector completo de atributos</span>
         </div>
       </div>
     </div>
 
-    <!-- Panel 5: Resumen de clusters -->
     <div class="col-12 col-xl-6">
-      <div class="card-dota">
+      <div class="card-dota" style="min-height:250px">
         <div class="card-header-dota">
           <i class="bi bi-diagram-3-fill" style="color:var(--dota-gold)"></i>
-          Panel 5 — Resumen de clusters
-          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
-            Tamaño y winrate por grupo
-          </span>
+          Panel 5 — Relación de Color Activo
         </div>
-        <div id="latent-p5"
-             style="min-height:360px;display:flex;align-items:center;justify-content:center">
-          <span style="color:var(--dota-muted);font-size:.85rem">Calculando resumen de clusters...</span>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Este panel me resume cómo se reparte el atributo que elegí para colorear el mapa.
+        </div>
+        <div id="latent-p5" style="min-height:180px;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Calculando relación de color...</span>
         </div>
       </div>
     </div>
 
-    <!-- Panel 6: Insight global -->
+    <div class="col-12 col-xl-6">
+      <div class="card-dota" style="min-height:250px">
+        <div class="card-header-dota">
+          <i class="bi bi-lightbulb-fill" style="color:var(--dota-gold)"></i>
+          Panel 6 — Valores Globales en las 3 Características Críticas
+        </div>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Aquí comparo GPM, XPM y KDA para ver si Radiant suele llegar mejor armado que Dire.
+        </div>
+        <div id="latent-p6" style="min-height:180px;display:flex;align-items:center;justify-content:center">
+          <span style="color:var(--dota-muted);font-size:.85rem;text-align:center">Calculando valores globales...</span>
+        </div>
+      </div>
+    </div>
+
     <div class="col-12 col-xl-6">
       <div class="card-dota">
         <div class="card-header-dota">
-          <i class="bi bi-lightbulb-fill" style="color:var(--dota-gold)"></i>
-          Panel 6 — Insight global
-          <span style="margin-left:auto;font-size:.72rem;color:var(--dota-muted)">
-            Promedios Radiant vs Dire
-          </span>
+          <i class="bi bi-grid-3x3-gap-fill" style="color:var(--dota-gold)"></i>
+          Panel 7 — Matriz Explícita
         </div>
-        <div id="latent-p6"
-             style="min-height:360px;display:flex;align-items:center;justify-content:center">
-          <span style="color:var(--dota-muted);font-size:.85rem">Calculando insights globales...</span>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Aquí miro los promedios del grupo seleccionado, pero ya escritos en limpio para comparar Radiant y Dire al instante.
+        </div>
+        <div id="latent-p7" style="min-height:280px;display:flex;align-items:center;justify-content:center">
+          <div class="latent-empty-state">Selecciona una o más partidas para ver la matriz explícita de atributos críticos.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="card-dota">
+        <div class="card-header-dota">
+          <i class="bi bi-fire" style="color:var(--dota-gold)"></i>
+          Panel 8 — Mapa de Calor del Atributo
+        </div>
+        <div style="padding:.7rem 1rem 0;color:var(--dota-muted);font-size:.78rem;line-height:1.45">
+          Este mapa me deja ver rápido dónde se acumulan los valores altos y dónde casi no hay actividad.
+        </div>
+        <div id="latent-p8" style="min-height:280px;display:flex;align-items:center;justify-content:center">
+          <div class="latent-empty-state">Cambia el atributo de color del Panel 3 para ver el mapa de calor con la misma lógica visual.</div>
         </div>
       </div>
     </div>

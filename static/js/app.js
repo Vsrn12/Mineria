@@ -1233,7 +1233,8 @@ cargarEspacioLatente();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ESPACIO LATENTE — Visualización D3 con vistas enlazadas
-//  4 paneles: P1 = scatter ganador | P2 = barras atributos | P3 = scatter atributo | P4 = tabla
+//  8 paneles: P1 = scatter ganador | P2 = barras atributos | P3 = scatter atributo
+//  P4 = vector completo | P5 = color activo | P6 = valores globales | P7 = matriz explícita | P8 = mapa de calor
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Estado global ────────────────────────────────────────────────────────────
@@ -1268,14 +1269,24 @@ const LATENT_DETAIL_STATS = [
   'gold_avg', 'level_avg'
 ];
 
+const LATENT_MATRIX_STATS = [
+  { key: 'win_pct', label: 'Win Rate' },
+  { key: 'gold_per_min_avg', label: 'GPM' },
+  { key: 'xp_per_min_avg', label: 'XPM' },
+  { key: 'kda_avg', label: 'KDA' },
+  { key: 'tower_kills_avg', label: 'Torres' },
+  { key: 'observer_uses_avg', label: 'Visión' },
+];
+
+function getActiveLatentAttr() {
+  return document.getElementById('latentColorAttr')?.value || 'win_pct_r';
+}
+
 // ─── Cargar datos desde el backend ────────────────────────────────────────────
 async function cargarEspacioLatente() {
   const method = document.getElementById('latentMethod').value;
   const n      = document.getElementById('latentN').value;
-  const clusterMethod = document.getElementById('latentClusterMethod').value;
   const clusterK = document.getElementById('latentClusterK').value;
-  const clusterEps = document.getElementById('latentClusterEps').value;
-  const clusterMinSamples = document.getElementById('latentClusterMinSamples').value;
 
   document.getElementById('latentMeta').textContent = `Calculando ${method.toUpperCase()}…`;
 
@@ -1294,11 +1305,11 @@ async function cargarEspacioLatente() {
   clearLatentP4();
   clearLatentP5();
   clearLatentP6();
+  clearLatentP7();
+  clearLatentP8();
 
   try {
-    const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}` +
-      `&cluster_method=${clusterMethod}&cluster_k=${clusterK}` +
-      `&cluster_eps=${clusterEps}&cluster_min_samples=${clusterMinSamples}`);
+    const resp = await fetch(`/api/espacio-latente?method=${method}&n=${n}&cluster_k=${clusterK}`);
     const data = await resp.json();
 
     latentState.data     = data;
@@ -1314,21 +1325,6 @@ async function cargarEspacioLatente() {
     if (meta.truncated) {
       metaText += ` · (mostrando un muestreo seguro de ${meta.max_allowed.toLocaleString()} partidas)`;
     }
-    if (meta.explained_variance) {
-      const pct = ((meta.explained_variance[0] + meta.explained_variance[1]) * 100).toFixed(1);
-      metaText += ` · varianza explicada PC1+PC2: ${pct}%`;
-    }
-    if (meta.cluster_method) {
-      metaText += ` · clustering: ${meta.cluster_method.toUpperCase()}`;
-      if (meta.cluster_method === 'kmeans') {
-        metaText += ` (${meta.cluster_k} clusters)`;
-      } else if (meta.cluster_method === 'dbscan') {
-        metaText += ` (eps=${meta.cluster_eps}, minPts=${meta.cluster_min_samples})`;
-      }
-      if (typeof meta.cluster_count === 'number') {
-        metaText += ` · clusters detectados: ${meta.cluster_count}`;
-      }
-    }
     if (meta.method_requested !== meta.method) {
       metaText += ' (UMAP no disponible → usando PCA)';
     }
@@ -1336,8 +1332,9 @@ async function cargarEspacioLatente() {
 
     renderLatentP1();
     renderLatentP3();
-    renderLatentP5();
     renderLatentP6();
+    renderLatentP7();
+    renderLatentP8();
     clearLatentP2();
     clearLatentP4();
 
@@ -1616,12 +1613,14 @@ function renderLatentP1() {
 
 function renderLatentP3() {
   if (!latentState.data) return;
-  const attrKey   = document.getElementById('latentColorAttr')?.value || 'win_pct_r';
+  const attrKey   = getActiveLatentAttr();
   const colorInfo = getLatentColorFn(latentState.data.puntos, attrKey);
   const lbl       = LATENT_COLOR_ATTRS.find(a => a.key === attrKey)?.label || attrKey;
   renderLatentScatter('latent-p3', latentState.data.puntos, colorInfo,
     `${latentState.data.meta.method.toUpperCase()} — ${lbl}`);
   updateLatentHighlight();
+  renderLatentP5();
+  renderLatentP8();
 }
 
 // ─── Selección de un punto (enlaza P1 ↔ P2 ↔ P3 ↔ P4) ───────────────────────
@@ -1665,14 +1664,7 @@ function clearLatentP4() {
 function updateLatentSelectionInfo() {
   const info = document.getElementById('latentSelectionInfo');
   if (!info) return;
-  const count = latentState.selected.length;
-  if (count === 0) {
-    info.textContent = 'Sin selección. Usa Ctrl/Cmd + clic o Shift + arrastra para seleccionar varios puntos.';
-  } else if (count === 1) {
-    info.textContent = '1 punto seleccionado. Ctrl/Cmd + clic para agregar/quitar puntos.';
-  } else {
-    info.textContent = `${count} puntos seleccionados. Los paneles muestran el promedio de la selección.`;
-  }
+  info.textContent = '';
 }
 
 function setLatentSelection(ids, append = false) {
@@ -1693,14 +1685,18 @@ function clearLatentSelection() {
   updateLatentHighlight();
   clearLatentP2();
   clearLatentP4();
+  clearLatentP7();
 }
 
 function renderLatentDetails() {
   if (!latentState.selected || latentState.selected.length === 0) {
     clearLatentP2();
     clearLatentP4();
+    clearLatentP7();
     return;
   }
+
+  renderLatentP7();
 
   if (latentState.selected.length === 1) {
     const id = latentState.selected[0];
@@ -1985,15 +1981,33 @@ function showLatentTooltip(event, d) {
 
 function clearLatentP5() {
   document.getElementById('latent-p5').innerHTML = `
-    <div style="color:var(--dota-muted);font-size:.85rem;display:flex;align-items:center;justify-content:center;height:360px;">
-      Calculando resumen de clusters...
+    <div class="latent-empty-state" style="min-height:180px">
+      Calculando relación de color...
     </div>`;
 }
 
 function clearLatentP6() {
   document.getElementById('latent-p6').innerHTML = `
-    <div style="color:var(--dota-muted);font-size:.85rem;display:flex;align-items:center;justify-content:center;height:360px;">
+    <div class="latent-empty-state" style="min-height:180px">
       Calculando insights globales...
+    </div>`;
+}
+
+function clearLatentP7() {
+  const container = document.getElementById('latent-p7');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="latent-empty-state">
+      Selecciona una o más partidas para ver la matriz explícita de atributos críticos.
+    </div>`;
+}
+
+function clearLatentP8() {
+  const container = document.getElementById('latent-p8');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="latent-empty-state">
+      Cambia el atributo de color del Panel 3 para ver el mapa de calor con la misma lógica visual.
     </div>`;
 }
 
@@ -2001,33 +2015,65 @@ function renderLatentP5() {
   const container = document.getElementById('latent-p5');
   if (!latentState.data) return clearLatentP5();
   const puntos = latentState.data.puntos;
-  const clusterStats = {};
-  puntos.forEach(p => {
-    const c = p.cluster ?? 'no-cluster';
-    if (!clusterStats[c]) clusterStats[c] = { count: 0, radiant: 0 };
-    clusterStats[c].count += 1;
-    if (p.radiant_win) clusterStats[c].radiant += 1;
-  });
-  const rows = Object.entries(clusterStats)
-    .sort((a, b) => b[1].count - a[1].count)
-    .map(([cluster, stats]) => {
-      const winRate = stats.count ? Math.round(stats.radiant * 100 / stats.count) : 0;
-      const color = cluster === 'no-cluster' ? '#808090' : `hsl(${(Number(cluster) * 63) % 360}, 65%, 55%)`;
-      return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.06)">
-          <div>
-            <div style="font-size:.82rem;font-weight:700;color:${color}">Cluster ${cluster}</div>
-            <div style="font-size:.72rem;color:var(--dota-muted)">Partidas: ${stats.count.toLocaleString()}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:.82rem;font-weight:700;color:var(--dota-gold)">${winRate}%</div>
-            <div style="font-size:.72rem;color:var(--dota-muted)">Radiant win rate</div>
-          </div>
-        </div>`;
+  const attrKey = getActiveLatentAttr();
+  const attr = LATENT_COLOR_ATTRS.find(a => a.key === attrKey) || { label: attrKey, type: 'continuous' };
+  const colorInfo = getLatentColorFn(puntos, attrKey);
+
+  if (colorInfo.type === 'categorical') {
+    const labels = (colorInfo.labels || []).map(item => {
+      let count = 0;
+      if (item.label === 'Radiant') {
+        count = puntos.filter(p => p.radiant_win).length;
+      } else if (item.label === 'Dire') {
+        count = puntos.filter(p => !p.radiant_win).length;
+      } else if (item.label === 'Ruido') {
+        count = puntos.filter(p => p.cluster === -1).length;
+      } else if (item.label.startsWith('Cluster ')) {
+        const clusterId = Number(item.label.replace('Cluster ', ''));
+        count = puntos.filter(p => p.cluster === clusterId).length;
+      }
+      return { ...item, count };
     });
+    const total = labels.reduce((sum, item) => sum + item.count, 0) || 1;
+
+    container.innerHTML = `
+      <div style="padding:.8rem .95rem;width:100%">
+        <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dota-muted);margin-bottom:.6rem">Color activo: ${attr.label}</div>
+        <div class="latent-chip-row">
+          ${labels.map(({ label, color, count }) => `
+            <span class="latent-chip" style="border-color:${color};color:${color}">
+              <span style="width:8px;height:8px;border-radius:999px;background:${color};display:inline-block"></span>
+              ${label} · ${(count * 100 / total).toFixed(1)}%
+            </span>`).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  const values = puntos.map(p => p[attrKey]).filter(v => v != null);
+  const [minV, maxV] = d3.extent(values);
+  const avgV = values.length ? d3.mean(values) : null;
+  const midV = values.length ? d3.median(values) : null;
   container.innerHTML = `
-    <div style="padding:.85rem .95rem;display:grid;gap:.55rem">
-      ${rows.join('')}
+    <div style="padding:.8rem .95rem;display:grid;gap:.7rem">
+      <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dota-muted)">Color activo: ${attr.label}</div>
+      <div class="latent-mini-summary">
+        <div class="latent-mini-stat">
+          <span class="label">Mínimo</span>
+          <span class="value">${minV != null ? minV.toFixed(2) : '—'}</span>
+        </div>
+        <div class="latent-mini-stat">
+          <span class="label">Promedio</span>
+          <span class="value">${avgV != null ? avgV.toFixed(2) : '—'}</span>
+        </div>
+        <div class="latent-mini-stat">
+          <span class="label">Mediana</span>
+          <span class="value">${midV != null ? midV.toFixed(2) : '—'}</span>
+        </div>
+      </div>
+      <div style="height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06)">
+        <div style="width:100%;height:100%;background:linear-gradient(90deg, #2f3546, ${d3.interpolateYlOrRd(0.35)}, ${d3.interpolateYlOrRd(1)})"></div>
+      </div>
     </div>`;
 }
 
@@ -2073,12 +2119,163 @@ function renderLatentP6() {
       </div>`;
   }).join('');
   container.innerHTML = `
-    <div style="padding:.85rem .95rem;display:grid;gap:.55rem">
+    <div style="padding:.8rem .95rem;display:grid;gap:.55rem">
+      <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dota-muted)">Valores globales en las 3 características críticas</div>
       ${content}
-      <div style="padding:.6rem .8rem;border-radius:8px;background:rgba(232,184,75,.08);color:var(--dota-gold);font-size:.8rem;line-height:1.35">
-        Estos valores son promedios globales sobre las partidas proyectadas. Si Radiant supera a Dire en GPM, XPM y KDA, es una señal consistente de por qué Radiant gana más.
-      </div>
     </div>`;
+}
+
+function renderLatentP7() {
+  const container = document.getElementById('latent-p7');
+  if (!latentState.data) return clearLatentP7();
+  if (!Array.isArray(latentState.selected) || latentState.selected.length === 0) return clearLatentP7();
+
+  const points = latentState.data.puntos.filter(d => latentState.selected.includes(d.match_id));
+  const avg = (key, side) => {
+    const vals = points.map(p => p[`${key}_${side}`]).filter(v => v != null);
+    return vals.length ? d3.mean(vals) : null;
+  };
+  const formatMatrixValue = (key, value) => {
+    if (value == null) return '—';
+    if (key === 'win_pct') return `${(value * 100).toFixed(1)}%`;
+    return fmtStat(key, value);
+  };
+
+  container.innerHTML = `
+    <div style="padding:.8rem .95rem;width:100%">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.55rem">
+        <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dota-muted)">Panel 7 · matriz explícita</div>
+        <div style="color:var(--dota-gold);font-size:.78rem;font-weight:700">${points.length} punto${points.length === 1 ? '' : 's'} seleccionado${points.length === 1 ? '' : 's'}</div>
+      </div>
+      <table class="latent-matrix-table">
+        <thead>
+          <tr>
+            <th style="text-align:left">Atributo</th>
+            <th style="text-align:right;color:#5cbf8a">Radiant</th>
+            <th style="text-align:right;color:#bf5c5c">Dire</th>
+            <th style="text-align:right">Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${LATENT_MATRIX_STATS.map(metric => {
+            const vR = avg(metric.key, 'r');
+            const vD = avg(metric.key, 'd');
+            const delta = (vR != null && vD != null) ? vR - vD : null;
+            return `
+              <tr>
+                <td style="color:var(--dota-text);font-weight:700">${metric.label}</td>
+                <td style="text-align:right;color:#5cbf8a">${formatMatrixValue(metric.key, vR)}</td>
+                <td style="text-align:right;color:#bf5c5c">${formatMatrixValue(metric.key, vD)}</td>
+                <td style="text-align:right;color:${delta != null && delta >= 0 ? '#5cbf8a' : '#bf5c5c'}">${delta != null ? (metric.key === 'win_pct' ? `${(delta * 100).toFixed(1)} pp` : fmt(delta, 2)) : '—'}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderLatentP8() {
+  const container = document.getElementById('latent-p8');
+  if (!latentState.data) return clearLatentP8();
+
+  const rawAttrKey = getActiveLatentAttr();
+  const attrKey = rawAttrKey === 'cluster' ? 'win_pct_r' : rawAttrKey;
+  const attr = LATENT_COLOR_ATTRS.find(a => a.key === attrKey) || { label: attrKey, type: 'continuous' };
+  const puntos = latentState.data.puntos;
+  const values = puntos.map(p => p[attrKey]).filter(v => v != null);
+  if (!values.length) return clearLatentP8();
+
+  const W = Math.max(container.clientWidth || 760, 340);
+  const H = 240;
+  const margin = { top: 26, right: 18, bottom: 28, left: 42 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+  const cols = 12;
+  const rows = 7;
+
+  const xExt = d3.extent(puntos, d => d.x);
+  const yExt = d3.extent(puntos, d => d.y);
+  const xPad = ((xExt[1] - xExt[0]) || 2) * 0.07;
+  const yPad = ((yExt[1] - yExt[0]) || 2) * 0.07;
+  const xScale = d3.scaleLinear().domain([xExt[0] - xPad, xExt[1] + xPad]).range([0, cols]);
+  const yScale = d3.scaleLinear().domain([yExt[0] - yPad, yExt[1] + yPad]).range([rows, 0]);
+
+  const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => []));
+  puntos.forEach(p => {
+    const cx = Math.max(0, Math.min(cols - 1, Math.floor(xScale(p.x))));
+    const cy = Math.max(0, Math.min(rows - 1, Math.floor(yScale(p.y))));
+    grid[cy][cx].push(p[attrKey]);
+  });
+
+  const colorScale = attrKey === 'radiant_win'
+    ? d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 1])
+    : d3.scaleSequential(d3.interpolateYlOrRd).domain(d3.extent(values));
+  const legendFn = attrKey === 'radiant_win' ? d3.interpolateRdYlGn : d3.interpolateYlOrRd;
+
+  const svg = d3.select(container).html('').append('svg')
+    .attr('width', '100%')
+    .attr('height', H)
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+  const cellW = innerW / cols;
+  const cellH = innerH / rows;
+
+  g.selectAll('rect.cell')
+    .data(grid.flat().map((cell, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const vals = cell.filter(v => v != null);
+      const value = vals.length ? d3.mean(vals) : null;
+      return { row, col, value };
+    }))
+    .enter()
+    .append('rect')
+    .attr('class', 'cell')
+    .attr('x', d => d.col * cellW)
+    .attr('y', d => d.row * cellH)
+    .attr('width', cellW - 1)
+    .attr('height', cellH - 1)
+    .attr('rx', 3)
+    .attr('fill', d => d.value == null ? 'rgba(255,255,255,.03)' : colorScale(d.value))
+    .attr('opacity', d => d.value == null ? 0.32 : 0.92)
+    .attr('stroke', 'rgba(255,255,255,.04)');
+
+  g.append('text').attr('x', 0).attr('y', -8)
+    .attr('fill', '#b8a060').attr('font-size', '10px').attr('font-weight', '700')
+    .text(`${attr.label} · mapa de calor`);
+
+  svg.append('text').attr('x', margin.left).attr('y', H - 8)
+    .attr('fill', '#5a6a80').attr('font-size', '8.5px')
+    .text('Eje X del espacio latente');
+  svg.append('text').attr('x', 10).attr('y', margin.top + innerH / 2)
+    .attr('fill', '#5a6a80').attr('font-size', '8.5px')
+    .attr('transform', `rotate(-90 10 ${margin.top + innerH / 2})`)
+    .text('Eje Y del espacio latente');
+
+  const legendX = margin.left + innerW - 110;
+  const legendY = 6;
+  const defs = svg.append('defs');
+  const gradId = `latent-grad-${attrKey.replace(/[^a-z0-9]/gi, '')}`;
+  const grad = defs.append('linearGradient').attr('id', gradId)
+    .attr('x1', '0%').attr('x2', '100%');
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    grad.append('stop').attr('offset', `${t * 100}%`).attr('stop-color', legendFn(t));
+  });
+  svg.append('rect')
+    .attr('x', legendX)
+    .attr('y', legendY)
+    .attr('width', 92)
+    .attr('height', 8)
+    .attr('rx', 3)
+    .attr('fill', `url(#${gradId})`);
+  svg.append('text').attr('x', legendX).attr('y', legendY + 20)
+    .attr('fill', '#5a6a80').attr('font-size', '8px')
+    .text(values.length ? d3.min(values).toFixed(2) : '');
+  svg.append('text').attr('x', legendX + 92).attr('y', legendY + 20)
+    .attr('text-anchor', 'end').attr('fill', '#5a6a80').attr('font-size', '8px')
+    .text(values.length ? d3.max(values).toFixed(2) : '');
 }
 
 function hideLatentTooltip() {

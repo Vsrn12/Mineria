@@ -11,7 +11,7 @@ import time
 import requests
 import numpy as np
 import pandas as pd
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_from_directory
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -46,6 +46,7 @@ knn_cols      = []     # columnas numéricas usadas en KNN
 scaler        = None   # StandardScaler ajustado
 load_time_ms  = 0
 anomaly_stats = {}     # Estadísticas de filas sin datos de héroes
+data_load_error = None # Error de carga diferida (si existe)
 
 # ─── Helper columnas héroe ────────────────────────────────────────────────────
 def es_col_heroe(col):
@@ -85,7 +86,9 @@ STAT_COLS_BASE = [
 
 def cargar_datos():
     """Carga el CSV, limpia columnas irrelevantes y prepara el modelo KNN."""
-    global df_raw, knn_model, knn_matrix, knn_cols, scaler, load_time_ms, anomaly_stats
+    global df_raw, knn_model, knn_matrix, knn_cols, scaler, load_time_ms, anomaly_stats, data_load_error
+
+    data_load_error = None
 
     t0 = time.perf_counter()
 
@@ -166,6 +169,37 @@ def cargar_datos():
     scaler       = sc
     load_time_ms = round((time.perf_counter() - t0) * 1000, 1)
     print(f"[OK] Dataset cargado: {len(df)} partidas | válidas: {n_valid} | sin héroes: {anomaly_stats['total_invalid']} | {load_time_ms} ms")
+
+
+def ensure_data_loaded():
+    """Carga el dataset bajo demanda y propaga un error claro si falla."""
+    global data_load_error
+
+    if df_raw is not None and knn_model is not None and scaler is not None:
+        return
+
+    if data_load_error is not None:
+        raise RuntimeError(data_load_error)
+
+    try:
+        cargar_datos()
+    except Exception as exc:
+        data_load_error = str(exc)
+        raise RuntimeError(data_load_error) from exc
+
+
+@app.before_request
+def preload_for_api_routes():
+    """En serverless, evita cargar CSV en import y lo hace solo para rutas API."""
+    if request.path.startswith("/api/"):
+        try:
+            ensure_data_loaded()
+        except RuntimeError as exc:
+            return jsonify({
+                "error": "No se pudo cargar el dataset",
+                "detalle": str(exc),
+                "csv_path": CSV_PATH,
+            }), 500
 
 
 def obtener_hero_nombres():
@@ -253,6 +287,11 @@ def row_a_dict(row):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/media/<path:filename>")
+def media_file(filename):
+    return send_from_directory(os.path.join(BASE_DIR, "Media"), filename)
 
 
 # ─── API: estadísticas generales ─────────────────────────────────────────────
@@ -933,7 +972,7 @@ def api_espacio_latente():
 
 # ─── Arranque ─────────────────────────────────────────────────────────────────
 
-cargar_datos()
-
 if __name__ == "__main__":
+    # Carga eager para entorno local (desarrollo)
+    cargar_datos()
     app.run(debug=True, port=5000)

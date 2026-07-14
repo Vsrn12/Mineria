@@ -5,7 +5,7 @@
 - Evalué el vector de características usado para la proyección del espacio latente.
 - Añadí clustering funcional en la pestaña **Espacio Latente** usando:
   - `KMeans` (clusterización por número fijo de clusters)
-  - `DBSCAN` (clusterización basada en densidad y ruido)
+  - `DBSCAN` (clusterización basada en densidad y ruido) (Nuevo)
 - Mejoré la interfaz con descripciones, leyendas y un control más explícito de parámetros.
 
 ## Vector de características
@@ -76,18 +76,3 @@ El espacio latente se construye a partir del mismo vector numérico usado para K
 - El clustering se aplica sobre la proyección 2D resultante, no sobre el vector original de 66 dimensiones.
 - Esto hace que los clusters reflejen la estructura visual en el plano, útil para explorar agrupamientos locales.
 - El proyecto ya tenía KNN funcional en la pestaña de `Partidas Similares`; la novedad aquí es que ahora también hay una capa de clustering visual.
-
-## Archivos modificados
-
-- `app.py`
-  - Añadí `KMeans` y `DBSCAN` a la API de espacio latente.
-  - Incluí parámetros de clustering y etiquetas `cluster` para cada punto.
-  - Añadí metadatos de features y configuración de clustering.
-- `templates/index.html`
-  - Añadí controles para elegir método de clustering y parámetros.
-  - Añadí la opción de colorear por `Clusters 2D`.
-- `static/js/app.js`
-  - Añadí lectura de parámetros de clustering.
-  - Añadí soporte para leyendas de clusters categóricos.
-  - Mejoré la metainformación mostrada al usuario.
-

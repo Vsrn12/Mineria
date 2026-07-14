@@ -198,6 +198,155 @@ body {
   line-height: 1.55;
 }
 
+.latent-hero-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 1rem;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(13,18,32,.98), rgba(20,25,38,.98));
+}
+
+.latent-hero-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.latent-hero-images {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: 1rem;
+  flex: 0 0 auto;
+}
+
+.latent-hero-img {
+  width: 132px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--dota-border);
+  box-shadow: 0 12px 28px rgba(0,0,0,.34);
+}
+
+.latent-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem 1rem;
+  align-items: flex-end;
+}
+
+.latent-toolbar > div {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.latent-toolbar .form-select-dota,
+.latent-toolbar .form-control-dota {
+  padding-top: .38rem;
+  padding-bottom: .38rem;
+}
+
+.latent-compact-note {
+  margin-top: .75rem;
+  color: var(--dota-muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.latent-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.latent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .34rem .65rem;
+  border-radius: 999px;
+  border: 1px solid var(--dota-border);
+  background: rgba(255,255,255,.03);
+  color: var(--dota-text);
+  font-size: .72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.latent-mini-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .55rem;
+}
+
+.latent-mini-stat {
+  padding: .55rem .65rem;
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.05);
+}
+
+.latent-mini-stat .label {
+  display: block;
+  color: var(--dota-muted);
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: .25rem;
+}
+
+.latent-mini-stat .value {
+  display: block;
+  font-size: .92rem;
+  font-weight: 800;
+  color: var(--dota-text);
+}
+
+.latent-matrix-table,
+.latent-matrix-table th,
+.latent-matrix-table td {
+  border-collapse: collapse;
+}
+
+.latent-matrix-table {
+  width: 100%;
+  font-size: .74rem;
+}
+
+.latent-matrix-table th,
+.latent-matrix-table td {
+  padding: .38rem .45rem;
+}
+
+.latent-matrix-table thead th {
+  color: var(--dota-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .68rem;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.latent-matrix-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+
+.latent-matrix-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.latent-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 1rem;
+  text-align: center;
+  color: var(--dota-muted);
+  font-size: .85rem;
+}
+
 /* ── HERO META GRID (estilo circular) ── */
 .hero-meta-grid {
   display: grid;
